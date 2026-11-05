@@ -33,6 +33,7 @@
 #include <interact.h>
 #include <version_info.h>
 #if defined(MQTT)
+#include <cloud_mqtt.h>
 #include <mqtt_handler.h>
 #endif
 #include <wifi_helper.h>
@@ -99,7 +100,7 @@ void setup() {
 
     Serial.begin(115200);       //Start serial connection for debug and manual input
     esp_log_set_vprintf(log_to_buffer_and_serial);
-    esp_log_level_set("*", ESP_LOG_DEBUG);    // Or VERBOSE for ESP_LOGV
+    esp_log_level_set("*", ESP_LOG_INFO);    // Or VERBOSE for ESP_LOGV
 
     Serial.printf("Firmware version: %s\n", firmwareVersion());
 
@@ -145,6 +146,7 @@ void setup() {
 #if defined(MQTT)
     initMqtt();
 #endif
+    initCloudMqtt();
     Cmd::kbd_tick.attach_ms(500, Cmd::cmdFuncHandler);
 
 //    esp_timer_dump(stdout);

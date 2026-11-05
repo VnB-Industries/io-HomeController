@@ -1,6 +1,5 @@
 /.pio/
 /.idea/
-/docs/
 compile_commands.json
 sdkconfig
 sdkconfig.HeltecESP32
@@ -18,3 +17,4 @@ src/CMakeLists.txt
 /archives/
 *.org
 include/user_config.h
+include/secrets.h

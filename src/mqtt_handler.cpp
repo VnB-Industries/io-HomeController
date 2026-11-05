@@ -115,9 +115,7 @@ static JsonDocument createDeviceObject(const std::string &id, const std::string 
     device["manufacturer"] = "Somfy";
     device["model"] = "IO Blind Bridge";
     device["sw_version"] = firmwareVersion();
-    if (!key.empty()) {
-        device["serial_number"] = key;
-    }
+    // The pairing key used to be published here as serial_number: it must stay on the device.
     device["via_device"] = GATEWAY_ID;
     return device;
 }

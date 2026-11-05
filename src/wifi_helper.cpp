@@ -14,6 +14,7 @@
    limitations under the License.
 */
 
+#include <secrets_config.h>
 #include <wifi_helper.h>
 #include <oled_display.h>
 #include <user_config.h>
@@ -328,7 +329,11 @@ static void runConfigPortal(const std::string& ssid, bool hasWifiConfiguration) 
     if (portalTimeoutMs > 0) {
         wm.setConfigPortalTimeout(portalTimeoutMs / 1000);
     }
+#if defined(HAS_SECRETS)
+    wm.autoConnect("iohc-setup", LOCAL_AP_PASSWORD);
+#else
     wm.autoConnect("iohc-setup");
+#endif
 
     const unsigned long portalStartTime = millis();
     bool portalClosed = false;

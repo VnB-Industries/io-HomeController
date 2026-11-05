@@ -45,7 +45,7 @@ inline std::string github_release_repo = "iohomecontrol";
 #define SYSLOG                       // Comment out to disable remote syslog
 #define SYSLOG_SECRET "7a06c4100d82ed8d"  // Shared token — Graylog drops messages without it
 inline bool syslog_enabled = false;    // Allow runtime control of syslog forwarding
-inline std::string syslog_server = ""; // Syslog server — defaults to syslog.speijkers.nl if unset
+inline std::string syslog_server = ""; // Syslog server — nothing is sent if unset
 inline uint16_t syslog_port = 5144;    // Syslog server port
 inline std::string syslog_tag = "";    // Optional tag prepended to hostname for filtering
 

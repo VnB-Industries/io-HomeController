@@ -11,6 +11,8 @@
 #include <LittleFS.h>
 #include <Update.h>
 #include <cstdlib>
+#include <device_commands.h>
+#include <secrets_config.h>
 #include <interact.h>
 #include <firmware_version.h>
 #include <iohcCryptoHelpers.h>
@@ -361,38 +363,25 @@ void handleApiAction(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
     return;
   }
 
-  const auto &remotes = IOHC::iohcRemote1W::getInstance()->getRemotes();
-  auto it = std::find_if(remotes.begin(), remotes.end(),
-                         [&](const IOHC::iohcRemote1W::remote &r) {
-    return bytesToHexString(r.node, sizeof(r.node)) == deviceId.c_str();
-  });
-  if (it == remotes.end()) {
-    request->send(400, "application/json",
-                  "{\"success\":false, \"message\":\"Unknown device\"}");
-    return;
-  }
-
-  IOHC::RemoteButton btn;
-  if (action == "open")
-    btn = IOHC::RemoteButton::Open;
-  else if (action == "close")
-    btn = IOHC::RemoteButton::Close;
-  else if (action == "stop")
-    btn = IOHC::RemoteButton::Stop;
-  else {
+  // Only the button actions are reachable from this route, as before.
+  if (action != "open" && action != "close" && action != "stop") {
     request->send(400, "application/json",
                   "{\"success\":false, \"message\":\"Invalid action\"}");
     return;
   }
 
-  Tokens t;
-  t.push_back(action.c_str());
-  t.push_back(it->description);
-  IOHC::iohcRemote1W::getInstance()->cmd(btn, &t);
-  broadcastDevicePosition(deviceId,
-                          static_cast<int>(it->positionTracker.getPosition()));
+  JsonDocument params;
+  params["deviceId"] = deviceId.c_str();
+  const CommandResult result = handleCommand(action.c_str(), params.as<JsonObjectConst>());
+  if (!result.ok) {
+    String error = "{\"success\":false, \"message\":\"";
+    error += result.message.c_str();
+    error += "\"}";
+    request->send(400, "application/json", error);
+    return;
+  }
 
-  String msg = "Action " + action + " sent to " + String(it->name.c_str());
+  String msg = result.message.c_str();
   addLogMessage(msg);
 
   root["success"] = true;
@@ -763,7 +752,8 @@ void handleApiSyslogTest(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
 void handleApiMqttGet(AsyncWebServerRequest *request, JsonObject &root) {
   root["server"] = mqtt_server.c_str();
   root["user"] = mqtt_user.c_str();
-  root["password"] = mqtt_password.c_str();
+  // Never sent back: an empty password in POST /api/mqtt keeps the stored one.
+  root["password"] = "";
   root["discovery"] = mqtt_discovery_topic.c_str();
   root["clientId"] = mqtt_client_id.c_str();
   root["port"] = mqtt_port;
@@ -931,7 +921,71 @@ void handleFilesystemUpload(AsyncWebServerRequest *request, String filename,
   }
 }
 
+// A page opened on another site must not be able to drive this server through the
+// visitor's browser: browsers always send Origin on cross-site POST and WebSocket.
+static bool isSameOrigin(AsyncWebServerRequest *request) {
+  if (!request->hasHeader("Origin")) {
+    return true;
+  }
+  return request->header("Origin") == String("http://") + request->host();
+}
+
+#if defined(HAS_SECRETS)
+static AsyncAuthenticationMiddleware s_localAuth;
+#endif
+
+static bool isAuthorized(AsyncWebServerRequest *request) {
+#if defined(HAS_SECRETS)
+  if (!request->authenticate(s_localAuth.username().c_str(), s_localAuth.credentials().c_str(),
+                             s_localAuth.realm().c_str(), s_localAuth.isHash())) {
+    return false;
+  }
+#endif
+  return isSameOrigin(request);
+}
+
+// The library runs upload callbacks while the body arrives, before the middleware
+// chain: without this check a firmware would be written before any login check.
+using UploadCallback = void (*)(AsyncWebServerRequest *, String, size_t, uint8_t *, size_t, bool);
+static ArUploadHandlerFunction guardedUpload(UploadCallback callback) {
+  return [callback](AsyncWebServerRequest *request, String filename, size_t index,
+                    uint8_t *data, size_t len, bool final) {
+    static AsyncWebServerRequest *authorizedUpload = nullptr;
+    if (index == 0) {
+      authorizedUpload = isAuthorized(request) ? request : nullptr;
+      if (authorizedUpload == nullptr) {
+        Serial.printf("Upload rejected: %s\n", request->url().c_str());
+      }
+    }
+    if (request != authorizedUpload) {
+      return;
+    }
+    callback(request, filename, index, data, len, final);
+    if (final) {
+      authorizedUpload = nullptr;
+    }
+  };
+}
+
 void setupWebServer() {
+  server.addMiddleware([](AsyncWebServerRequest *request, ArMiddlewareNext next) {
+    if (!isSameOrigin(request)) {
+      request->send(403, "text/plain", "Forbidden");
+      return;
+    }
+    next();
+  });
+#if defined(HAS_SECRETS)
+  s_localAuth.setUsername(LOCAL_WEB_USER);
+  s_localAuth.setPassword(LOCAL_WEB_PASSWORD);
+  s_localAuth.setRealm("MiOpenIO");
+  s_localAuth.setAuthType(AsyncAuthType::AUTH_DIGEST);
+  s_localAuth.generateHash();
+  server.addMiddleware(&s_localAuth);
+#else
+  Serial.println("WARNING: no include/secrets.h, local dashboard has no authentication");
+#endif
+
   Serial.println("Initializing HTTP server ...");
 
   // Serve static files from /web_interface_data
@@ -977,15 +1031,15 @@ void setupWebServer() {
   server.on("/api/syslog", HTTP_POST, jsonPost(handleApiSyslogSet));
 #endif
   server.on("/api/firmware", HTTP_POST, handleFirmwareUpdate,
-            handleFirmwareUpload);
+            guardedUpload(handleFirmwareUpload));
   server.on("/api/filesystem", HTTP_POST, handleFilesystemUpdate,
-            handleFilesystemUpload);
+            guardedUpload(handleFilesystemUpload));
   server.on("/api/download/devices", HTTP_GET, handleDownloadDevices);
   server.on("/api/download/remotes", HTTP_GET, handleDownloadRemotes);
   server.on("/api/upload/devices", HTTP_POST, handleUploadDevicesDone,
-            handleUploadDevicesFile);
+            guardedUpload(handleUploadDevicesFile));
   server.on("/api/upload/remotes", HTTP_POST, handleUploadRemotesDone,
-            handleUploadRemotesFile);
+            guardedUpload(handleUploadRemotesFile));
 
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);

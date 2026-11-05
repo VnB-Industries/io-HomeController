@@ -49,9 +49,8 @@ namespace {
         }
 
         if (!nvs_read_string(NVS_KEY_SYSLOG_SERVER, syslog_server)) {
-            // No server stored yet — pre-fill community server as default
-            syslog_server = "syslog.speijkers.nl";
-            nvs_write_string(NVS_KEY_SYSLOG_SERVER, syslog_server);
+            // No server stored yet: logs must not go to a third party by default.
+            syslog_server.clear();
         }
 
         if (!nvs_read_u16(NVS_KEY_SYSLOG_PORT, syslog_port)) {

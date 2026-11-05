@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'self' wss://*.hivemq.cloud; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Volets">
+  <meta name="theme-color" content="#5A6E8C">
+  <title>Volets io</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Volets</h1>
+    <span id="connection" class="chip chip-off" role="status">Broker déconnecté</span>
+    <button id="open-settings" class="icon-button" type="button" aria-label="Réglages">⚙</button>
+  </header>
+
+  <main>
+    <section id="devices-view" hidden>
+      <ul id="devices"></ul>
+      <p id="empty" class="hint" hidden>Aucun volet reçu de la carte pour l'instant.</p>
+    </section>
+
+    <section id="settings-view" hidden>
+      <h2>Réglages</h2>
+      <p id="settings-error" class="error" role="alert" hidden></p>
+      <form id="settings-form" novalidate>
+        <label>Adresse du cluster
+          <input id="host" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="url" placeholder="xxxx.s1.eu.hivemq.cloud" required>
+        </label>
+        <label>Identifiant MQTT
+          <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        </label>
+        <label>Mot de passe MQTT
+          <input id="password" type="password" autocomplete="current-password" required>
+        </label>
+        <label>Clé de commande
+          <input id="command-key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        </label>
+        <button class="primary" type="submit">Enregistrer</button>
+        <button id="close-settings" type="button" hidden>Fermer</button>
+        <button id="logout" class="danger" type="button" hidden>Se déconnecter</button>
+      </form>
+    </section>
+  </main>
+
+  <dialog id="device-dialog">
+    <form id="device-form" novalidate>
+      <h2>Volet</h2>
+      <label>Nom
+        <input id="device-name" maxlength="32" required>
+      </label>
+      <label>Temps de course (secondes)
+        <input id="device-time" type="number" inputmode="numeric" min="1" max="600" step="1" required>
+      </label>
+      <label class="checkbox">
+        <input id="device-repeat" type="checkbox">
+        Réessayer si le volet ne répond pas
+      </label>
+      <p id="device-error" class="error" role="alert" hidden></p>
+      <button class="primary" type="submit">Enregistrer</button>
+      <button id="device-cancel" type="button">Annuler</button>
+    </form>
+  </dialog>
+
+  <script src="vendor/mqtt.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

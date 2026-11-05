@@ -1,11 +1,11 @@
 # Contrat MQTT de la webapp
 
-La webapp et la carte communiquent par un broker MQTT cloud. Elles ouvrent chacune une connexion sortante chiffrée. Aucun port n'est ouvert sur la box.
+La webapp et la carte communiquent par le broker cloud [flespi](https://flespi.com/mqtt-broker). Elles ouvrent chacune une connexion sortante chiffrée. Aucun port n'est ouvert sur la box.
 
-| Usage | Protocole | Adresse |
+| Client | Connexion | Authentification |
 | --- | --- | --- |
-| Carte | MQTT sur TLS, certificat vérifié (ISRG Root X1) | `<cluster>:8883` |
-| Webapp | MQTT sur WebSocket TLS | `wss://<cluster>:8884/mqtt` |
+| Carte | `wss://mqtt.flespi.io:443`, certificat vérifié (GlobalSign Root CA - R6) | Jeton flespi en nom d'utilisateur |
+| Webapp | `wss://mqtt.flespi.io:443` | Jeton flespi en nom d'utilisateur |
 
 ## Topics
 

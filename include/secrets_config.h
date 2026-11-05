@@ -7,8 +7,7 @@
 #include <secrets.h>
 #define HAS_SECRETS
 
-#if !defined(CLOUD_MQTT_HOST) || !defined(CLOUD_MQTT_USER) || !defined(CLOUD_MQTT_PASSWORD) || \
-    !defined(CLOUD_COMMAND_KEY) || !defined(LOCAL_WEB_USER) || !defined(LOCAL_WEB_PASSWORD) || \
+#if !defined(CLOUD_MQTT_TOKEN) || !defined(CLOUD_COMMAND_KEY) || !defined(LOCAL_WEB_USER) || !defined(LOCAL_WEB_PASSWORD) || \
     !defined(LOCAL_AP_PASSWORD)
 #error "include/secrets.h is incomplete: compare it with include/secrets.example.h"
 #endif

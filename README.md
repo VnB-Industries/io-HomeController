@@ -70,7 +70,7 @@ _After any other changes:_
 
 ## iPhone and remote access (this fork)
 
-This fork adds a remote control path that needs no open port and no other always-on device: an installable web app ([`webapp/`](webapp/)) talks to the board through a cloud MQTT broker over TLS, and every command is signed so the broker cannot forge one. See [the setup guide](docs/mise-en-route.md) and [the MQTT contract](docs/mqtt-contract.md) (in French).
+This fork adds a remote control path that needs no open port and no other always-on device: an installable web app ([`webapp/`](webapp/)) talks to the board through the flespi cloud MQTT broker over TLS, and every command is signed so the broker cannot forge one. See [the setup guide](docs/mise-en-route.md) and [the MQTT contract](docs/mqtt-contract.md) (in French).
 
 ## Web Interface (Experimental)
 

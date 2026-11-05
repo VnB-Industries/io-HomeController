@@ -6,10 +6,8 @@
 #ifndef SECRETS_H
 #define SECRETS_H
 
-// Cloud MQTT broker, account used only by this board.
-#define CLOUD_MQTT_HOST     "<cluster>.s1.eu.hivemq.cloud"
-#define CLOUD_MQTT_USER     "esp32-device"
-#define CLOUD_MQTT_PASSWORD "<at least 24 random characters>"
+// flespi ACL token used only by this board.
+#define CLOUD_MQTT_TOKEN    "<flespi token>"
 
 // Shared with the webapp, never with the broker: every command is signed with it
 // (HMAC-SHA256), so neither the broker nor a leaked MQTT password can move a blind.

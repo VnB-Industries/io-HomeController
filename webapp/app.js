@@ -7,8 +7,7 @@ const TOPIC_ACK = `${TOPIC_PREFIX}/ack`;
 const TOPIC_STATE = `${TOPIC_PREFIX}/state`;
 const TOPIC_STATUS = `${TOPIC_PREFIX}/status`;
 
-// Pre-fills the settings screen. Not a secret, but publishing it is optional.
-const DEFAULT_CLUSTER = "";
+const BROKER_URL = "wss://mqtt.flespi.io:443";
 const STORAGE_KEY = "volets.config";
 const ACK_TIMEOUT_MS = 5000;
 const RECONNECT_AFTER_HIDDEN_MS = 5000;
@@ -24,7 +23,7 @@ const ERROR_LABELS = {
 
 const elements = Object.fromEntries(
   ["connection", "open-settings", "devices-view", "devices", "empty", "settings-view", "settings-error",
-    "settings-form", "host", "username", "password", "command-key", "close-settings", "logout",
+    "settings-form", "token", "command-key", "close-settings", "logout",
     "device-dialog", "device-form", "device-name", "device-time", "device-repeat", "device-error",
     "device-cancel"].map((id) => [id, document.getElementById(id)])
 );
@@ -62,11 +61,6 @@ function clearConfig() {
   } catch {
     // Nothing stored.
   }
-}
-
-function normalizeHost(value) {
-  const host = value.trim().toLowerCase().replace(/^[a-z]+:\/\//, "").replace(/[:/].*$/, "");
-  return /^[a-z0-9.-]+$/.test(host) ? host : "";
 }
 
 // Text covered by the signature. Same construction as signedText() in src/cloud_mqtt.cpp.
@@ -244,9 +238,8 @@ function disconnect() {
 
 function connect() {
   disconnect();
-  client = mqtt.connect(`wss://${config.host}:8884/mqtt`, {
-    username: config.username,
-    password: config.password,
+  client = mqtt.connect(BROKER_URL, {
+    username: config.token,
     clientId: `webapp-${crypto.randomUUID()}`,
     clean: true,
     keepalive: 30,
@@ -267,10 +260,10 @@ function connect() {
     renderConnection();
   });
   client.on("error", (error) => {
-    // CONNACK 4 or 5: wrong login. Retrying cannot help.
+    // CONNACK 4 or 5: invalid token or disallowed origin. Retrying cannot help.
     if (error && (error.code === 4 || error.code === 5)) {
       disconnect();
-      showSettings("Identifiant ou mot de passe MQTT refusé.");
+      showSettings("Jeton flespi refusé.");
     }
   });
   client.on("message", (topic, message) => {
@@ -302,9 +295,7 @@ function showDevices() {
 function showSettings(error) {
   elements["devices-view"].hidden = true;
   elements["settings-view"].hidden = false;
-  elements.host.value = config ? config.host : DEFAULT_CLUSTER;
-  elements.username.value = config ? config.username : "webapp-ios";
-  elements.password.value = config ? config.password : "";
+  elements.token.value = config ? config.token : "";
   elements["command-key"].value = config ? config.commandKey : "";
   elements["close-settings"].hidden = !config || Boolean(error);
   elements.logout.hidden = !config;
@@ -333,15 +324,13 @@ function openDeviceDialog(deviceId) {
 
 elements["settings-form"].addEventListener("submit", async (event) => {
   event.preventDefault();
-  const host = normalizeHost(elements.host.value);
-  const username = elements.username.value.trim();
-  const password = elements.password.value;
+  const token = elements.token.value.trim();
   const commandKey = elements["command-key"].value.trim();
-  if (!host || !username || !password || !commandKey) {
-    showError("Tous les champs sont obligatoires.");
+  if (!token || !commandKey) {
+    showError("Les deux champs sont obligatoires.");
     return;
   }
-  config = { host, username, password, commandKey };
+  config = { token, commandKey };
   saveConfig(config);
   await start();
 });

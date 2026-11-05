@@ -1,10 +1,12 @@
 # Mise en route
 
-## 1. Créer le broker
+## 1. Créer les jetons flespi
 
-1. Créez un cluster gratuit sur [HiveMQ Cloud](https://console.hivemq.cloud) et notez son adresse.
-2. Dans *Access Management*, créez deux comptes avec deux mots de passe aléatoires d'au moins 24 caractères : `esp32-device` et `webapp-ios`.
-3. Si l'offre le permet, limitez chaque compte aux topics `home/esp32lora/#`.
+1. Créez un compte gratuit sur [flespi.io](https://flespi.io).
+2. Dans *Tokens*, créez deux jetons de type **ACL**, un pour la carte et un pour l'iPhone. N'utilisez pas le jeton Master.
+3. Sur chaque jeton, autorisez uniquement MQTT sur le topic `home/esp32lora/#`, en publication et en abonnement.
+4. Sur le jeton de l'iPhone, limitez *Allowed origins* à `https://vnb-industries.github.io`.
+5. Donnez aux deux jetons une date d'expiration lointaine (`expire`) et notez-la. Un jeton expiré est supprimé définitivement : il faudra alors en créer un autre, et reflasher la carte si c'est le sien.
 
 ## 2. Préparer les secrets
 
@@ -12,7 +14,7 @@
 cp include/secrets.example.h include/secrets.h
 ```
 
-Remplissez `include/secrets.h`. Ce fichier est ignoré par Git. Générez chaque secret avec :
+Remplissez `include/secrets.h`, avec le jeton de la carte dans `CLOUD_MQTT_TOKEN`. Ce fichier est ignoré par Git. Générez les autres secrets avec :
 
 ```bash
 openssl rand -hex 16
@@ -55,19 +57,19 @@ Adresse : `https://vnb-industries.github.io/io-HomeController/`
 
 1. Ouvrez l'adresse dans Safari, puis Partager, *Sur l'écran d'accueil*.
 2. Ouvrez l'app depuis l'écran d'accueil. L'app installée ne partage pas les données de Safari.
-3. Saisissez l'adresse du cluster, le compte `webapp-ios`, son mot de passe et `CLOUD_COMMAND_KEY`.
+3. Saisissez le jeton de l'iPhone et `CLOUD_COMMAND_KEY`.
 
 ## Sécurité
 
-- Le broker relaie les messages sans pouvoir les signer : ni lui ni un mot de passe MQTT volé ne suffisent à commander un volet.
-- iPhone perdu : changez le mot de passe `webapp-ios`, puis `CLOUD_COMMAND_KEY` dans `secrets.h`, et reflashez la carte.
+- Le broker relaie les messages sans pouvoir les signer : ni lui ni un jeton flespi volé ne suffisent à commander un volet.
+- iPhone perdu : supprimez son jeton dans flespi, changez `CLOUD_COMMAND_KEY` dans `secrets.h`, et reflashez la carte.
 - Le tableau de bord local demande `LOCAL_WEB_USER` et `LOCAL_WEB_PASSWORD`. Sans `include/secrets.h`, il n'a aucune protection : c'est le cas des binaires publiés par la CI.
 - N'ouvrez aucun port sur la box.
 - Le client MQTT d'origine (Home Assistant, port 1883, sans TLS) doit rester sur le réseau local.
 
 ## Tester une commande à la main
 
-Pour vérifier les refus depuis un client MQTT (console HiveMQ, MQTT Explorer), calculez la signature ainsi :
+Pour vérifier les refus depuis un client MQTT ([MQTT Board](https://mqttboard.flespi.io), MQTT Explorer), calculez la signature ainsi :
 
 ```bash
 printf 'c-test-1\n%s\nopen\na1b2c3\n' "$(date +%s)" | openssl dgst -sha256 -hmac "$CLOUD_COMMAND_KEY"

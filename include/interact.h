@@ -97,6 +97,11 @@ void cmdFuncHandler();
 void createCommands();
 void init();
 
+// One line: free heap, lowest free heap since boot, largest allocatable block.
+void printHeapLine();
+// printHeapLine() plus unused stack (bytes) of each known task.
+void printMemoryReport();
+
 }
 
 #endif

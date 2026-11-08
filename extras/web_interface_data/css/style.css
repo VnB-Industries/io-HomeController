@@ -166,6 +166,16 @@ ul#device-list li {
 ul#device-list li .btn {
   margin: 1px auto;
 }
+ul#device-list li .device-target {
+  width: 90px;
+  margin: 4px auto 0;
+  accent-color: var(--color-accent2);
+}
+ul#device-list li .device-target-label {
+  padding: 0 0 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
 ul#device-list span {
   padding: 5px 10px;
   text-align: center;

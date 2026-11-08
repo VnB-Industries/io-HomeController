@@ -63,9 +63,10 @@ CommandResult handleCommand(const char *action, JsonObjectConst params) {
 
     IOHC::RemoteButton button{};
     const bool isButton = toButton(action, button);
+    const bool isPosition = strcmp(action, "position") == 0;
     const bool isSetting = strcmp(action, "time1W") == 0 || strcmp(action, "repeat1W") == 0 ||
                            strcmp(action, "edit1W") == 0;
-    if (!isButton && !isSetting) {
+    if (!isButton && !isPosition && !isSetting) {
         return {false, "Invalid action"};
     }
 
@@ -92,6 +93,24 @@ CommandResult handleCommand(const char *action, JsonObjectConst params) {
         broadcastDevicePosition(deviceId.c_str(), static_cast<int>(remote->positionTracker.getPosition()));
 #endif
         result.message = std::string("Action ") + action + " sent to " + displayName;
+    } else if (isPosition) {
+        // The motor moves to the percentage itself; the tracker only estimates progress.
+        if (!params["percent"].is<int>()) {
+            return {false, "Invalid percent"};
+        }
+        const int percent = params["percent"].as<int>();
+        if (percent < 0 || percent > 100) {
+            return {false, "Invalid percent"};
+        }
+        Tokens tokens;
+        tokens.push_back(action);
+        tokens.push_back(description);
+        tokens.push_back(std::to_string(percent));
+        remotes->cmd(IOHC::RemoteButton::Position, &tokens);
+#if defined(WEBSERVER)
+        broadcastDevicePosition(deviceId.c_str(), static_cast<int>(remote->positionTracker.getPosition()));
+#endif
+        result.message = "Position " + std::to_string(percent) + "% sent to " + displayName;
     } else if (strcmp(action, "time1W") == 0) {
         if (!params["seconds"].is<int>()) {
             return {false, "Invalid seconds"};

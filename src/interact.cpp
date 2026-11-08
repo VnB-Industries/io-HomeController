@@ -54,6 +54,40 @@ TimersUS::TickerUsESP32 kbd_tick;
 #endif
 TimerHandle_t consoleTimer;
 
+void printHeapLine() {
+    Serial.printf("Heap: free %u, min %u, largest block %u\n",
+                  static_cast<unsigned>(ESP.getFreeHeap()),
+                  static_cast<unsigned>(ESP.getMinFreeHeap()),
+                  static_cast<unsigned>(ESP.getMaxAllocHeap()));
+}
+
+void printMemoryReport() {
+    printHeapLine();
+    // This core is built without the FreeRTOS trace facility, so tasks are
+    // looked up by name. A task that is not running is reported as absent.
+    static const char *const kTasks[] = {
+        "loopTask", "WiFi_Worker", "handle_interrupt_task", "CallbackTask",
+        "cloudMqtt", "mqtt_task", "async_tcp", "positionTracker",
+        "mqttScheduler", "DisplayTask", "versionInfo",
+    };
+    Serial.println("Unused stack (bytes):");
+    for (const char *name : kTasks) {
+        // FreeRTOS stores names truncated to configMAX_TASK_NAME_LEN - 1 and
+        // asserts if the queried name is not shorter than configMAX_TASK_NAME_LEN.
+        char stored[configMAX_TASK_NAME_LEN];
+        strncpy(stored, name, sizeof(stored) - 1);
+        stored[sizeof(stored) - 1] = '\0';
+        TaskHandle_t handle = xTaskGetHandle(stored);
+        if (handle) {
+            // On ESP32 the stack high-water mark is reported in bytes.
+            Serial.printf("  %-22s %u\n", name,
+                          static_cast<unsigned>(uxTaskGetStackHighWaterMark(handle)));
+        } else {
+            Serial.printf("  %-22s not running\n", name);
+        }
+    }
+}
+
 static char _rxbuffer[512];
 static uint8_t _len = 0;
 static uint8_t _avail = 0;
@@ -62,6 +96,9 @@ static uint8_t _avail = 0;
  * different devices and functionalities.
  */
 void createCommands() {
+    Cmd::addHandler((char *) "mem", (char *) "Show heap and per-task unused stack", [](Tokens *cmd)-> void {
+        printMemoryReport();
+    });
     // Atlantic 2W
     Cmd::addHandler((char *) "powerOn", (char *) "Permit to retrieve paired devices", [](Tokens *cmd)-> void {
         IOHC::iohcCozyDevice2W::getInstance()->cmd(IOHC::DeviceButton::powerOn, nullptr);

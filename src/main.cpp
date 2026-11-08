@@ -720,6 +720,17 @@ void txUserBuffer(Tokens *cmd) {
     digitalWrite(RX_LED, digitalRead(RX_LED) ^ 1);
 }
 
+// Arduino default is 8 KB; setup() plus loop() measured ~2.8 KB used.
+SET_LOOP_TASK_STACK_SIZE(5 * 1024);
+
 void loop() {
     loopWebServer(); // For ESPAsyncWebServer, this is typically not needed.
+
+    // Periodic heap line, so a slow leak or a shrinking margin shows in the log.
+    static uint32_t lastHeapLogMs = 0;
+    const uint32_t now = millis();
+    if (now - lastHeapLogMs >= 60000UL) {
+        lastHeapLogMs = now;
+        Cmd::printHeapLine();
+    }
 }

@@ -181,6 +181,8 @@ std::string signedText(const char *id, long long ts, const char *action, JsonObj
         value = params["enabled"].as<bool>() ? "1" : "0";
     } else if (params["name"].is<const char *>()) {
         value = params["name"].as<const char *>();
+    } else if (params["percent"].is<int>()) {
+        value = std::to_string(params["percent"].as<int>());
     }
     const char *deviceId = params["deviceId"].is<const char *>() ? params["deviceId"].as<const char *>() : "";
     return std::string(id) + "\n" + std::to_string(ts) + "\n" + action + "\n" + deviceId + "\n" + value;
@@ -451,7 +453,7 @@ void initCloudMqtt() {
 
     s_commandQueue = xQueueCreate(4, sizeof(std::string *));
     if (s_commandQueue == nullptr ||
-        xTaskCreate(cloudTask, "cloudMqtt", 8192, nullptr, 1, nullptr) != pdPASS) {
+        xTaskCreate(cloudTask, "cloudMqtt", 6144, /* measured ~2 KB used; commands run here */ nullptr, 1, nullptr) != pdPASS) {
         Serial.println("CloudMQTT: could not start");
     }
 }

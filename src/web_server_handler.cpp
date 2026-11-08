@@ -62,9 +62,15 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     serializeJson(doc, payload);
     client->text(payload);
 
-    // Stream cached log messages individually to avoid a large JSON payload
+    // Stream cached log messages individually to avoid a large JSON payload.
+    // Only the newest few: each queued frame holds its own heap buffer, and
+    // queuing the whole 50-entry backlog of packet traces on connect ran the
+    // heap out during RF bursts (bad_alloc in makeSharedBuffer).
+    constexpr size_t kBacklogOnConnect = 15;
     auto logMsgs = getLogMessages();
-    for (const auto &m : logMsgs) {
+    const size_t first = logMsgs.size() > kBacklogOnConnect ? logMsgs.size() - kBacklogOnConnect : 0;
+    for (size_t i = first; i < logMsgs.size(); ++i) {
+      const auto &m = logMsgs[i];
       JsonDocument logDoc;
       logDoc["type"] = "log";
       logDoc["message"] = m;
@@ -167,6 +173,12 @@ ArJsonRequestHandlerFunction _jsonPost(const ArPostRequestHandlerFunction<JsonVa
     handler(request, doc, response->getRoot());
 
     if (!request->isSent()) {
+      // A handler reports failure by setting "success": false in its reply.
+      // (Calling request->send() inside a handler does not stop this reply,
+      // which then went out as 200 with an empty body.)
+      if (response->getRoot()["success"] == false) {
+        response->setCode(400);
+      }
       response->setLength();
       request->send(response.release());
     }
@@ -357,27 +369,27 @@ void handleApiAction(AsyncWebServerRequest *request, JsonObject &doc, JsonObject
   action.toLowerCase();
 
   if (deviceId.isEmpty() || action.isEmpty()) {
-    request->send(
-        400, "application/json",
-        "{\"success\":false, \"message\":\"Missing deviceId or action\"}");
+    root["success"] = false;
+    root["message"] = "Missing deviceId or action";
     return;
   }
 
-  // Only the button actions are reachable from this route, as before.
-  if (action != "open" && action != "close" && action != "stop") {
-    request->send(400, "application/json",
-                  "{\"success\":false, \"message\":\"Invalid action\"}");
+  // Button actions, plus a target position from the device slider.
+  if (action != "open" && action != "close" && action != "stop" && action != "position") {
+    root["success"] = false;
+    root["message"] = "Invalid action";
     return;
   }
 
   JsonDocument params;
   params["deviceId"] = deviceId.c_str();
+  if (action == "position") {
+    params["percent"] = doc["percent"];
+  }
   const CommandResult result = handleCommand(action.c_str(), params.as<JsonObjectConst>());
   if (!result.ok) {
-    String error = "{\"success\":false, \"message\":\"";
-    error += result.message.c_str();
-    error += "\"}";
-    request->send(400, "application/json", error);
+    root["success"] = false;
+    root["message"] = result.message.c_str();
     return;
   }
 
@@ -1047,6 +1059,8 @@ void setupWebServer() {
   auto &staticHandler =
       server.serveStatic("/", LittleFS, "/web_interface_data/");
   staticHandler.setDefaultFile("index.html");
+  // Web files are stored uncompressed; skip the .gz probe that logs an error per request.
+  staticHandler.setTryGzipFirst(false);
   staticHandler.setFilter([](AsyncWebServerRequest *request) {
     return !request->url().startsWith("/api");
   });

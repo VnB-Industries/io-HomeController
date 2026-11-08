@@ -96,13 +96,8 @@ void initMqtt() {
     mqttClient.onDisconnect(onMqttDisconnect);
     mqttClient.onMessage(onMqttMessage);
 
-    if (xTaskCreatePinnedToCore(mqttSchedulerTask, "mqttScheduler", 4096, nullptr,
-                                1, &s_mqttSchedulerTask, tskNO_AFFINITY) != pdPASS) {
-        Serial.println("Failed to create MQTT scheduler task");
-        s_mqttSchedulerTask = nullptr;
-        return;
-    }
-
+    // The scheduler task is created by connectToMqtt() once a server is set,
+    // so a board without a local broker does not spend its stack.
     if (WiFi.status() == WL_CONNECTED) {
         connectToMqtt();
     }
@@ -380,9 +375,22 @@ void connectToMqtt() {
         Serial.println("WiFi not connected, skipping MQTT connection");
         return;
     }
+    static bool s_warnedNoServer = false;
     if (mqtt_server.empty()) {
-        Serial.println("MQTT server not configured");
+        // The local broker is optional when the cloud link is used: warn once, not on every retry.
+        if (!s_warnedNoServer) {
+            Serial.println("MQTT server not configured");
+            s_warnedNoServer = true;
+        }
         return;
+    }
+    s_warnedNoServer = false;
+    // Started on first use: it handles reconnects and the heartbeat.
+    if (!s_mqttSchedulerTask &&
+        xTaskCreatePinnedToCore(mqttSchedulerTask, "mqttScheduler", 4096, nullptr,
+                                1, &s_mqttSchedulerTask, tskNO_AFFINITY) != pdPASS) {
+        Serial.println("Failed to create MQTT scheduler task");
+        s_mqttSchedulerTask = nullptr;
     }
     s_lastMqttConnectAttemptMs = millis();
     Serial.printf("Connecting to MQTT at %s:%u...\n", mqtt_server.c_str(), mqtt_port);
@@ -437,6 +445,7 @@ static void mqttSchedulerTask(void*) {
         const uint32_t now = millis();
 
         if (mqttStatus == ConnState::Disconnected && WiFi.status() == WL_CONNECTED &&
+            !mqtt_server.empty() &&
             static_cast<int32_t>(now - s_lastMqttConnectAttemptMs) >= static_cast<int32_t>(MQTT_RECONNECT_INTERVAL_MS)) {
             connectToMqtt();
         }

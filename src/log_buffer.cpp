@@ -14,6 +14,10 @@
 namespace {
     std::deque<String> logDeque;
     const size_t MAX_LOG_ENTRIES = 50;
+    // addLogMessage() runs on the radio, callback, web and cloud tasks while
+    // the web server reads the buffer; unguarded, two concurrent pop_front()
+    // calls double-free an entry (observed: heap_caps_free assert during RF bursts).
+    SemaphoreHandle_t logMutex = xSemaphoreCreateMutex();
 
 #if defined(WEBSERVER)
     // Keeps the WS log stream from flooding: always let through the rare,
@@ -57,10 +61,12 @@ namespace {
 }
 
 void addLogMessage(const String &msg) {
+    xSemaphoreTake(logMutex, portMAX_DELAY);
     if (logDeque.size() >= MAX_LOG_ENTRIES) {
         logDeque.pop_front();
     }
     logDeque.push_back(msg);
+    xSemaphoreGive(logMutex);
 #if defined(WEBSERVER)
     if (shouldBroadcastLog(msg)) {
         broadcastLog(msg);
@@ -72,5 +78,8 @@ void addLogMessage(const String &msg) {
 }
 
 std::vector<String> getLogMessages() {
-    return std::vector<String>(logDeque.begin(), logDeque.end());
+    xSemaphoreTake(logMutex, portMAX_DELAY);
+    std::vector<String> copy(logDeque.begin(), logDeque.end());
+    xSemaphoreGive(logMutex);
+    return copy;
 }

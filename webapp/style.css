@@ -107,6 +107,9 @@ button:not(:disabled):active { filter: brightness(0.85); }
 .device-position { color: var(--muted); font-variant-numeric: tabular-nums; }
 .device-edit { border: 0; background: transparent; }
 .device-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.device-target-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.device-target { flex: 1; min-width: 0; accent-color: var(--accent); }
+.device-target-value { min-width: 48px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .device-status { min-height: 20px; margin-top: 6px; color: var(--muted); font-size: 14px; }
 .device-status.ok { color: var(--ok); }
 .device-status.pending { color: var(--warn); }

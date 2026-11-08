@@ -27,6 +27,7 @@ Le préfixe est `home/esp32lora`. Il est défini dans `src/cloud_mqtt.cpp` et da
 | `action` | `params` | Effet |
 | --- | --- | --- |
 | `open`, `close`, `stop` | `deviceId` | Pilote le volet |
+| `position` | `deviceId`, `percent` (0 à 100, 100 = ouvert) | Envoie le volet à ce pourcentage |
 | `time1W` | `deviceId`, `seconds` (1 à 600) | Règle le temps de course |
 | `repeat1W` | `deviceId`, `enabled` (booléen) | Réessaie si le volet ne répond pas |
 | `edit1W` | `deviceId`, `name` (1 à 32 octets, sans caractère de contrôle) | Renomme le volet |
@@ -45,7 +46,7 @@ deviceId
 valeur
 ```
 
-`valeur` vaut `seconds` en décimal, `1` ou `0` pour `enabled`, `name`, ou une chaîne vide pour les autres commandes.
+`valeur` vaut `seconds` en décimal, `1` ou `0` pour `enabled`, `name`, `percent` en décimal, ou une chaîne vide pour les autres commandes.
 
 ## Ordre des contrôles sur la carte
 

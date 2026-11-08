@@ -71,6 +71,35 @@
                     });
                 }));
 
+                // Target position: the value shows while dragging, the command goes out on release.
+                const target = document.createElement("input");
+                target.type = "range";
+                target.min = "0";
+                target.max = "100";
+                target.step = "5";
+                target.value = String(Math.round((device.position || 0) / 5) * 5);
+                target.classList.add("device-target");
+                const targetLabel = document.createElement("span");
+                targetLabel.classList.add("device-target-label");
+                targetLabel.textContent = target.value + "%";
+                target.setAttribute("aria-label", device.name + " position");
+                target.addEventListener("input", function () {
+                    targetLabel.textContent = target.value + "%";
+                });
+                target.addEventListener("change", function () {
+                    window.MiOpenApi.postJson("/api/action", {
+                        deviceId: device.id,
+                        action: "position",
+                        percent: Number(target.value)
+                    }).then(function (result) {
+                        app.logStatus(result.message || ("Position " + target.value + "% sent."));
+                    }).catch(function (error) {
+                        app.logStatus(error.message, true);
+                    });
+                });
+                listItem.appendChild(target);
+                listItem.appendChild(targetLabel);
+
                 listItem.appendChild(createDeviceButton(app.i18nText("button.edit", "edit"), "edit", async function () {
                     try {
                         const freshDevices = await window.MiOpenApi.requestJson("/api/devices");

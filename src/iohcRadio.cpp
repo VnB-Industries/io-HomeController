@@ -143,7 +143,7 @@ namespace IOHC {
 
         // start state machine
         printf("Starting Interrupt Handler...\n");
-        BaseType_t task_code = xTaskCreatePinnedToCore(handle_interrupt_task, "handle_interrupt_task", 8192,
+        BaseType_t task_code = xTaskCreatePinnedToCore(handle_interrupt_task, "handle_interrupt_task", 8192, /* receive path decodes and printf()s each frame; 3 KB overflowed */
                                                        this /*nullptr*//*device*/, /*tskIDLE_PRIORITY*/4,
                                                        &handle_interrupt, /*tskNO_AFFINITY*/xPortGetCoreID());
         if (task_code != pdPASS) {

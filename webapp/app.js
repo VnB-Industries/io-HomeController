@@ -18,7 +18,8 @@ const ERROR_LABELS = {
   "Unknown device": "Volet inconnu",
   "Invalid action": "Commande refusée",
   "Invalid name": "Nom invalide",
-  "Invalid seconds": "Temps de course invalide"
+  "Invalid seconds": "Temps de course invalide",
+  "Invalid percent": "Position invalide"
 };
 
 const elements = Object.fromEntries(
@@ -72,6 +73,8 @@ function signedText(id, ts, action, params) {
     value = params.enabled ? "1" : "0";
   } else if (typeof params.name === "string") {
     value = params.name;
+  } else if (Number.isInteger(params.percent)) {
+    value = String(params.percent);
   }
   return [id, ts, action, params.deviceId || "", value].join("\n");
 }
@@ -120,6 +123,16 @@ async function runButton(deviceId, action) {
   }
 }
 
+async function runPosition(deviceId, percent) {
+  setDeviceStatus(deviceId, "En cours…", "pending");
+  const error = await sendCommand("position", { deviceId, percent });
+  if (error) {
+    setDeviceStatus(deviceId, error, "error");
+  } else {
+    setDeviceStatus(deviceId, `Position ${percent} % envoyée`, "ok");
+  }
+}
+
 function setDeviceStatus(deviceId, text, kind) {
   deviceStatus.set(deviceId, { text, kind });
   const line = elements.devices.querySelector(`[data-id="${CSS.escape(deviceId)}"] .device-status`);
@@ -152,6 +165,12 @@ function renderDevices() {
     item.style.setProperty("--position", `${device.position}%`);
     item.querySelector(".device-name").textContent = device.name;
     item.querySelector(".device-position").textContent = `${device.position} %`;
+    // Follow the reported position, except while the user is dragging the slider.
+    const target = item.querySelector(".device-target");
+    if (document.activeElement !== target) {
+      target.value = String(Math.round(device.position / 5) * 5);
+      item.querySelector(".device-target-value").textContent = `${target.value} %`;
+    }
   }
   for (const item of Array.from(elements.devices.children)) {
     if (!seen.has(item.dataset.id)) {
@@ -184,13 +203,32 @@ function createDeviceItem(deviceId) {
     button("▼", "Fermer", () => runButton(deviceId, "close"))
   );
 
+  // Target position: the value shows while dragging, the command goes out on release.
+  const targetRow = document.createElement("label");
+  targetRow.className = "device-target-row";
+  const target = document.createElement("input");
+  target.type = "range";
+  target.min = "0";
+  target.max = "100";
+  target.step = "5";
+  target.className = "device-target";
+  target.dataset.command = "true";
+  target.setAttribute("aria-label", "Position cible");
+  const targetValue = document.createElement("span");
+  targetValue.className = "device-target-value";
+  target.addEventListener("input", () => {
+    targetValue.textContent = `${target.value} %`;
+  });
+  target.addEventListener("change", () => runPosition(deviceId, Number(target.value)));
+  targetRow.append(target, targetValue);
+
   const status = document.createElement("p");
   const known = deviceStatus.get(deviceId);
   status.className = `device-status ${known ? known.kind : ""}`;
   status.textContent = known ? known.text : "";
   status.setAttribute("role", "status");
 
-  item.append(head, buttons, status);
+  item.append(head, buttons, targetRow, status);
   return item;
 }
 

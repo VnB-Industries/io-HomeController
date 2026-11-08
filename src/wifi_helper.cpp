@@ -454,7 +454,7 @@ void initWifi() {
     // the connect task never runs.
     applySavedNetworkSettings();
 
-    xTaskCreatePinnedToCore(wifiWorker, "WiFi_Worker", 8192, NULL, 3, &wifiWorkerTaskHandle, 1);
+    xTaskCreatePinnedToCore(wifiWorker, "WiFi_Worker", 5120, /* measured ~3 KB used */ NULL, 3, &wifiWorkerTaskHandle, 1);
 
     WiFi.onEvent(onWiFiEvent);
     WiFi.setAutoReconnect(true);

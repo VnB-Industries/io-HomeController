@@ -9,7 +9,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Volets">
-  <meta name="theme-color" content="#5A6E8C">
+  <meta name="theme-color" content="#1D2733">
   <title>Volets io</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -17,19 +17,25 @@
 </head>
 <body>
   <header>
-    <h1>Volets</h1>
-    <span id="connection" class="chip chip-off" role="status">Broker déconnecté</span>
-    <button id="open-settings" class="icon-button" type="button" aria-label="Réglages">⚙</button>
+    <div class="masthead">
+      <h1>Volets</h1>
+      <p id="connection" class="status status-off" role="status">Pas de connexion</p>
+    </div>
+    <button id="open-settings" class="icon-button" type="button" aria-label="Réglages">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M13 7a2 2 0 1 0 4 0a2 2 0 1 0-4 0M7 17a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/></svg>
+    </button>
   </header>
 
   <main>
     <section id="devices-view" hidden>
       <ul id="devices"></ul>
-      <p id="empty" class="hint" hidden>Aucun volet reçu de la carte pour l'instant.</p>
+      <p id="empty" class="empty" hidden>Aucun volet pour l'instant. Ils apparaîtront ici dès que le boîtier sera en ligne.</p>
+      <p id="drag-hint" class="hint" hidden>Faites glisser un volet pour choisir sa hauteur.</p>
     </section>
 
     <section id="settings-view" hidden>
-      <h2>Réglages</h2>
+      <h2>Connexion au boîtier</h2>
+      <p class="lead">Le jeton flespi et la clé de commande se trouvent dans <code>include/secrets.h</code>.</p>
       <p id="settings-error" class="error" role="alert" hidden></p>
       <form id="settings-form" novalidate>
         <label>Jeton flespi
@@ -45,9 +51,9 @@
     </section>
   </main>
 
-  <dialog id="device-dialog">
+  <dialog id="device-dialog" aria-labelledby="device-dialog-title">
     <form id="device-form" novalidate>
-      <h2>Volet</h2>
+      <h2 id="device-dialog-title">Réglages du volet</h2>
       <label>Nom
         <input id="device-name" maxlength="32" required>
       </label>
@@ -59,8 +65,10 @@
         Réessayer si le volet ne répond pas
       </label>
       <p id="device-error" class="error" role="alert" hidden></p>
-      <button class="primary" type="submit">Enregistrer</button>
-      <button id="device-cancel" type="button">Annuler</button>
+      <div class="sheet-actions">
+        <button id="device-cancel" type="button">Annuler</button>
+        <button class="primary" type="submit">Enregistrer</button>
+      </div>
     </form>
   </dialog>
 

@@ -1,7 +1,7 @@
 // Interface only: MQTT data never goes through this cache.
 // Network first, so a published update always wins over the cached copy;
 // the cache is used only without network. Bump the version when the file list changes.
-const CACHE = "volets-v2";
+const CACHE = "volets-v3";
 const FILES = [
   "./",
   "index.html",

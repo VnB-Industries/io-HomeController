@@ -23,7 +23,7 @@ const ERROR_LABELS = {
 };
 
 const elements = Object.fromEntries(
-  ["connection", "open-settings", "devices-view", "devices", "empty", "settings-view", "settings-error",
+  ["connection", "open-settings", "devices-view", "devices", "empty", "drag-hint", "settings-view", "settings-error",
     "settings-form", "token", "command-key", "close-settings", "logout",
     "device-dialog", "device-form", "device-name", "device-time", "device-repeat", "device-error",
     "device-cancel"].map((id) => [id, document.getElementById(id)])
@@ -127,6 +127,8 @@ async function runPosition(deviceId, percent) {
   setDeviceStatus(deviceId, "En cours…", "pending");
   const error = await sendCommand("position", { deviceId, percent });
   if (error) {
+    targets.delete(deviceId);
+    renderDevices();
     setDeviceStatus(deviceId, error, "error");
   } else {
     setDeviceStatus(deviceId, `Position ${percent} % envoyée`, "ok");
@@ -142,35 +144,91 @@ function setDeviceStatus(deviceId, text, kind) {
   }
 }
 
-function button(label, ariaLabel, onClick) {
+const SVG_NS = "http://www.w3.org/2000/svg";
+const ICON_PATHS = {
+  open: "M6 15l6-6 6 6",
+  stop: "M8 8h8v8H8z",
+  close: "M6 9l6 6 6-6",
+  edit: "M4 20h4L19 9l-4-4L4 16v4z"
+};
+const STEP = 5;
+const KEY_SEND_DELAY_MS = 700;
+// A requested position stays drawn until the estimate reaches it, or this long after the travel time.
+const TARGET_GRACE_MS = 5000;
+const targets = new Map();
+
+function icon(name) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("icon", `icon-${name}`);
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", ICON_PATHS[name]);
+  svg.append(path);
+  return svg;
+}
+
+function button(content, ariaLabel, onClick) {
   const element = document.createElement("button");
   element.type = "button";
-  element.textContent = label;
+  element.append(content);
   element.setAttribute("aria-label", ariaLabel);
   element.dataset.command = "true";
   element.addEventListener("click", onClick);
   return element;
 }
 
+function commandsEnabled() {
+  return brokerConnected && boardOnline;
+}
+
+function snap(percent) {
+  return Math.min(100, Math.max(0, Math.round(percent / STEP) * STEP));
+}
+
+function findItem(deviceId) {
+  return elements.devices.querySelector(`[data-id="${CSS.escape(deviceId)}"]`);
+}
+
+// Draws the amber line and shows the value in the reading; null hides both.
+function showTarget(item, percent, preview) {
+  item.classList.toggle("has-target", percent !== null);
+  item.classList.toggle("is-preview", preview);
+  if (percent !== null) {
+    item.querySelector(".window").style.setProperty("--target", String((100 - percent) / 100));
+  }
+}
+
 function renderDevices() {
   elements.empty.hidden = devices.length > 0;
+  elements["drag-hint"].hidden = devices.length === 0;
   const seen = new Set();
   for (const device of devices) {
     seen.add(device.id);
-    let item = elements.devices.querySelector(`[data-id="${CSS.escape(device.id)}"]`);
+    let item = findItem(device.id);
     if (!item) {
       item = createDeviceItem(device.id);
       elements.devices.appendChild(item);
     }
-    item.style.setProperty("--position", `${device.position}%`);
-    item.querySelector(".device-name").textContent = device.name;
-    item.querySelector(".device-position").textContent = `${device.position} %`;
-    // Follow the reported position, except while the user is dragging the slider.
-    const target = item.querySelector(".device-target");
-    if (document.activeElement !== target) {
-      target.value = String(Math.round(device.position / 5) * 5);
-      item.querySelector(".device-target-value").textContent = `${target.value} %`;
+    const position = Math.round(device.position);
+    const pane = item.querySelector(".window");
+    pane.style.setProperty("--closed", String((100 - device.position) / 100));
+    pane.setAttribute("aria-label", `Hauteur de ${device.name}`);
+    item.querySelector(".device-name-text").textContent = device.name;
+    item.querySelector(".device-name").setAttribute("aria-label", `Réglages de ${device.name}`);
+    item.querySelector(".device-buttons").setAttribute("aria-label", device.name);
+
+    if (pane.dataset.preview !== undefined) {
+      continue;  // The user is choosing a height: leave the preview alone.
     }
+    const target = targets.get(device.id);
+    if (target && (Math.abs(target.percent - device.position) <= 2 || Date.now() > target.until)) {
+      targets.delete(device.id);
+    }
+    showTarget(item, targets.has(device.id) ? targets.get(device.id).percent : null, false);
+    item.querySelector(".device-position").textContent = String(position);
+    pane.setAttribute("aria-valuenow", String(position));
+    pane.setAttribute("aria-valuetext", `${position} % ouvert`);
   }
   for (const item of Array.from(elements.devices.children)) {
     if (!seen.has(item.dataset.id)) {
@@ -180,47 +238,141 @@ function renderDevices() {
   renderCommandAvailability();
 }
 
+function commitTarget(deviceId, percent) {
+  const device = devices.find((entry) => entry.id === deviceId);
+  const travelMs = ((device && device.travel_time) || 30) * 1000;
+  targets.set(deviceId, { percent, until: Date.now() + travelMs + TARGET_GRACE_MS });
+  renderDevices();
+  runPosition(deviceId, percent);
+}
+
+// The window is the slider: drag (or tap) to choose a height, arrow keys from the keyboard.
+function attachWindowControl(pane, deviceId) {
+  let dragging = false;
+  let keyTimer = 0;
+
+  const preview = (percent) => {
+    const item = pane.closest(".device");
+    pane.dataset.preview = String(percent);
+    showTarget(item, percent, true);
+    item.querySelector(".device-position").textContent = String(percent);
+    pane.setAttribute("aria-valuenow", String(percent));
+    pane.setAttribute("aria-valuetext", `${percent} % ouvert`);
+  };
+  const fromPointer = (event) => {
+    const rect = pane.getBoundingClientRect();
+    return snap(100 - ((event.clientY - rect.top) / rect.height) * 100);
+  };
+  const release = (send) => {
+    if (!dragging) {
+      return;
+    }
+    dragging = false;
+    const percent = Number(pane.dataset.preview);
+    delete pane.dataset.preview;
+    if (send) {
+      commitTarget(deviceId, percent);
+    } else {
+      renderDevices();
+    }
+  };
+
+  pane.addEventListener("pointerdown", (event) => {
+    if (!commandsEnabled() || event.button > 0) {
+      return;
+    }
+    dragging = true;
+    try {
+      pane.setPointerCapture(event.pointerId);
+    } catch {
+      // Synthetic or already released pointer: the drag still works without capture.
+    }
+    preview(fromPointer(event));
+    event.preventDefault();
+  });
+  pane.addEventListener("pointermove", (event) => {
+    if (dragging) {
+      preview(fromPointer(event));
+    }
+  });
+  pane.addEventListener("pointerup", () => release(true));
+  pane.addEventListener("pointercancel", () => release(false));
+
+  pane.addEventListener("keydown", (event) => {
+    if (!commandsEnabled()) {
+      return;
+    }
+    const steps = { ArrowUp: STEP, ArrowRight: STEP, ArrowDown: -STEP, ArrowLeft: -STEP, PageUp: 25, PageDown: -25 };
+    const base = pane.dataset.preview !== undefined
+      ? Number(pane.dataset.preview)
+      : Number(pane.getAttribute("aria-valuenow") || 0);
+    let percent;
+    if (event.key in steps) {
+      percent = snap(base + steps[event.key]);
+    } else if (event.key === "Home") {
+      percent = 0;
+    } else if (event.key === "End") {
+      percent = 100;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    preview(percent);
+    clearTimeout(keyTimer);
+    keyTimer = setTimeout(() => {
+      delete pane.dataset.preview;
+      commitTarget(deviceId, percent);
+    }, KEY_SEND_DELAY_MS);
+  });
+}
+
 function createDeviceItem(deviceId) {
   const item = document.createElement("li");
   item.className = "device";
   item.dataset.id = deviceId;
 
-  const head = document.createElement("div");
-  head.className = "device-head";
-  const name = document.createElement("span");
+  const pane = document.createElement("div");
+  pane.className = "window";
+  pane.tabIndex = 0;
+  pane.dataset.command = "true";
+  pane.setAttribute("role", "slider");
+  pane.setAttribute("aria-orientation", "vertical");
+  pane.setAttribute("aria-valuemin", "0");
+  pane.setAttribute("aria-valuemax", "100");
+  const glass = document.createElement("div");
+  glass.className = "glass";
+  const shutter = document.createElement("div");
+  shutter.className = "shutter";
+  const targetLine = document.createElement("div");
+  targetLine.className = "target-line";
+  pane.append(glass, shutter, targetLine);
+  attachWindowControl(pane, deviceId);
+
+  const name = document.createElement("button");
+  name.type = "button";
   name.className = "device-name";
-  const position = document.createElement("span");
-  position.className = "device-position";
-  const edit = button("✎", "Modifier le volet", () => openDeviceDialog(deviceId));
-  edit.classList.add("device-edit");
-  head.append(name, position, edit);
+  const nameText = document.createElement("span");
+  nameText.className = "device-name-text";
+  name.append(nameText, icon("edit"));
+  name.addEventListener("click", () => openDeviceDialog(deviceId));
+
+  const reading = document.createElement("p");
+  reading.className = "device-reading";
+  const value = document.createElement("span");
+  value.className = "device-position";
+  const unit = document.createElement("span");
+  unit.className = "device-unit";
+  unit.textContent = "% ouvert";
+  reading.append(value, unit);
 
   const buttons = document.createElement("div");
   buttons.className = "device-buttons";
+  buttons.setAttribute("role", "group");
   buttons.append(
-    button("▲", "Ouvrir", () => runButton(deviceId, "open")),
-    button("■", "Stop", () => runButton(deviceId, "stop")),
-    button("▼", "Fermer", () => runButton(deviceId, "close"))
+    button(icon("open"), "Ouvrir", () => runButton(deviceId, "open")),
+    button(icon("stop"), "Stop", () => runButton(deviceId, "stop")),
+    button(icon("close"), "Fermer", () => runButton(deviceId, "close"))
   );
-
-  // Target position: the value shows while dragging, the command goes out on release.
-  const targetRow = document.createElement("label");
-  targetRow.className = "device-target-row";
-  const target = document.createElement("input");
-  target.type = "range";
-  target.min = "0";
-  target.max = "100";
-  target.step = "5";
-  target.className = "device-target";
-  target.dataset.command = "true";
-  target.setAttribute("aria-label", "Position cible");
-  const targetValue = document.createElement("span");
-  targetValue.className = "device-target-value";
-  target.addEventListener("input", () => {
-    targetValue.textContent = `${target.value} %`;
-  });
-  target.addEventListener("change", () => runPosition(deviceId, Number(target.value)));
-  targetRow.append(target, targetValue);
 
   const status = document.createElement("p");
   const known = deviceStatus.get(deviceId);
@@ -228,28 +380,32 @@ function createDeviceItem(deviceId) {
   status.textContent = known ? known.text : "";
   status.setAttribute("role", "status");
 
-  item.append(head, buttons, targetRow, status);
+  item.append(pane, name, reading, buttons, status);
   return item;
 }
 
 function renderCommandAvailability() {
-  const enabled = brokerConnected && boardOnline;
+  const enabled = commandsEnabled();
   for (const element of elements.devices.querySelectorAll("[data-command]")) {
-    element.disabled = !enabled;
+    if (element instanceof HTMLButtonElement) {
+      element.disabled = !enabled;
+    } else {
+      element.setAttribute("aria-disabled", String(!enabled));
+    }
   }
 }
 
 function renderConnection() {
-  const chip = elements.connection;
+  const status = elements.connection;
   if (!brokerConnected) {
-    chip.textContent = "Broker déconnecté";
-    chip.className = "chip chip-off";
+    status.textContent = "Pas de connexion";
+    status.className = "status status-off";
   } else if (!boardOnline) {
-    chip.textContent = "ESP32 hors ligne";
-    chip.className = "chip chip-offline";
+    status.textContent = "Boîtier hors ligne";
+    status.className = "status status-offline";
   } else {
-    chip.textContent = "ESP32 en ligne";
-    chip.className = "chip chip-online";
+    status.textContent = "Boîtier en ligne";
+    status.className = "status status-online";
   }
   renderCommandAvailability();
 }
@@ -387,6 +543,7 @@ elements.logout.addEventListener("click", () => {
   signingKey = null;
   devices = [];
   deviceStatus.clear();
+  targets.clear();
   elements.devices.replaceChildren();
   showSettings();
 });

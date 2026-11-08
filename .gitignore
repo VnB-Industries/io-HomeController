@@ -20,3 +20,4 @@ include/user_config.h
 include/secrets.h
 # Board device files (pairing keys), kept by tools/prepare_fs.py: never commit, the repo is public.
 /config/
+__pycache__/

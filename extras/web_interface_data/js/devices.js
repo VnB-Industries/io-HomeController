@@ -144,13 +144,16 @@
                                 "Repeat command if shutter does not respond"
                             ),
                             defaultRepeatOnNoResponse: !!device.repeatOnNoResponse,
+                            showSun: true,
+                            defaultSunrise: device.sunrise,
+                            defaultSunset: device.sunset,
                             protectedMessage: app.i18nText(
                                 "popup.active_blocks_destructive",
                                 "Disable Active before unpairing or deleting."
                             ),
                             pairLabel: app.i18nText("popup.pair_label_device", "Add / Remove the device to the physical screen"),
                             deleteInfo: app.i18nText("popup.delete_device_info", "Only use when the device is not linked to a physical screen."),
-                            onSave: async function (newName, newTiming, _deviceValue, repeatOnNoResponse) {
+                            onSave: async function (newName, newTiming, _deviceValue, repeatOnNoResponse, sun) {
                                 try {
                                     if (newName.trim() && newName !== device.name) {
                                         const renameResult = await window.MiOpenApi.postJson("/api/command", {
@@ -176,6 +179,17 @@
                                             command: "repeat1W " + (repeatOnNoResponse ? "1" : "0")
                                         });
                                         app.logStatus(repeatResult.message || "Repeat setting updated.");
+                                    }
+
+                                    const sunText = function (offset) {
+                                        return Number.isInteger(offset) ? String(offset) : "off";
+                                    };
+                                    if (sun && (sun.sunrise !== device.sunrise || sun.sunset !== device.sunset)) {
+                                        const sunResult = await window.MiOpenApi.postJson("/api/command", {
+                                            deviceId: device.id,
+                                            command: "sun1W " + sunText(sun.sunrise) + " " + sunText(sun.sunset)
+                                        });
+                                        app.logStatus(sunResult.message || "Sun schedule updated.");
                                     }
 
                                     await fetchAndDisplayDevices(app);

@@ -110,6 +110,10 @@
             displayEnabledInput: document.getElementById("display-enabled"),
             displayUpdateButton: document.getElementById("display-update"),
             displayStatus: document.getElementById("display-status"),
+            locationLatitudeInput: document.getElementById("location-latitude"),
+            locationLongitudeInput: document.getElementById("location-longitude"),
+            locationUpdateButton: document.getElementById("location-update"),
+            locationStatus: document.getElementById("location-status"),
             syslogEnabledInput: document.getElementById("syslog-enabled"),
             syslogServerInput: document.getElementById("syslog-server"),
             syslogPortInput: document.getElementById("syslog-port"),
@@ -280,6 +284,9 @@
         if (app.elements.networkSaveButton) {
             app.elements.networkSaveButton.addEventListener("click", app.saveNetworkConfig);
         }
+        if (app.elements.locationUpdateButton) {
+            app.elements.locationUpdateButton.addEventListener("click", app.updateLocationConfig);
+        }
         if (app.elements.fallbackSaveButton) {
             app.elements.fallbackSaveButton.addEventListener("click", app.saveFallbackConfig);
         }
@@ -382,6 +389,7 @@
             app.loadNetworkConfig();
             app.loadFallbackConfig();
             app.loadDisplayConfig();
+            app.loadLocationConfig();
             app.loadSyslogConfig();
         };
         app.fetchAndDisplayDevices();

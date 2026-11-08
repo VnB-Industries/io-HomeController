@@ -7,6 +7,7 @@
 #include <cloud_mqtt.h>
 #include <iohcCryptoHelpers.h>
 #include <iohcRemote1W.h>
+#include <sun_schedule.h>
 #include <tokens.h>
 #include <user_config.h>
 #include <utils.h>
@@ -48,6 +49,20 @@ bool isValidRoom(const char *room) {
     return room[0] == '\0' || isValidName(room);
 }
 
+// An offset in minutes, or null (or missing) when the sun action is off.
+bool parseSunOffset(JsonVariantConst value, bool &enabled, int &offset) {
+    enabled = !value.isNull();
+    offset = 0;
+    if (!enabled) {
+        return true;
+    }
+    if (!value.is<int>()) {
+        return false;
+    }
+    offset = value.as<int>();
+    return offset >= -kSunMaxOffsetMinutes && offset <= kSunMaxOffsetMinutes;
+}
+
 bool toButton(const char *action, IOHC::RemoteButton &button) {
     if (strcmp(action, "open") == 0) {
         button = IOHC::RemoteButton::Open;
@@ -66,11 +81,21 @@ bool toButton(const char *action, IOHC::RemoteButton &button) {
 CommandResult handleCommand(const char *action, JsonObjectConst params) {
     const std::lock_guard<std::mutex> lock(s_commandMutex);
 
+    // Board-wide setting: no device involved.
+    if (strcmp(action, "location") == 0) {
+        if (!params["latitude"].is<const char *>() || !params["longitude"].is<const char *>() ||
+            !setSunLocation(params["latitude"].as<const char *>(), params["longitude"].as<const char *>())) {
+            return {false, "Invalid location"};
+        }
+        return {true, "Location updated"};
+    }
+
     IOHC::RemoteButton button{};
     const bool isButton = toButton(action, button);
     const bool isPosition = strcmp(action, "position") == 0;
     const bool isSetting = strcmp(action, "time1W") == 0 || strcmp(action, "repeat1W") == 0 ||
-                           strcmp(action, "edit1W") == 0 || strcmp(action, "room1W") == 0;
+                           strcmp(action, "edit1W") == 0 || strcmp(action, "room1W") == 0 ||
+                           strcmp(action, "sun1W") == 0;
     if (!isButton && !isPosition && !isSetting) {
         return {false, "Invalid action"};
     }
@@ -136,6 +161,19 @@ CommandResult handleCommand(const char *action, JsonObjectConst params) {
             return {false, "Could not set room"};
         }
         result.message = "Room updated";
+    } else if (strcmp(action, "sun1W") == 0) {
+        bool sunrise = false;
+        bool sunset = false;
+        int sunriseOffset = 0;
+        int sunsetOffset = 0;
+        if (!parseSunOffset(params["sunrise"], sunrise, sunriseOffset) ||
+            !parseSunOffset(params["sunset"], sunset, sunsetOffset)) {
+            return {false, "Invalid offset"};
+        }
+        if (!remotes->setSunSchedule(description, sunrise, sunriseOffset, sunset, sunsetOffset)) {
+            return {false, "Could not set sun schedule"};
+        }
+        result.message = "Sun schedule updated";
     } else if (strcmp(action, "repeat1W") == 0) {
         if (!params["enabled"].is<bool>()) {
             return {false, "Invalid enabled"};

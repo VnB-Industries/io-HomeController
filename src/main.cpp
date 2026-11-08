@@ -34,6 +34,7 @@
 #include <version_info.h>
 #if defined(MQTT)
 #include <cloud_mqtt.h>
+#include <sun_schedule.h>
 #include <mqtt_handler.h>
 #endif
 #include <wifi_helper.h>
@@ -147,6 +148,7 @@ void setup() {
     initMqtt();
 #endif
     initCloudMqtt();
+    initSunSchedule();
     Cmd::kbd_tick.attach_ms(500, Cmd::cmdFuncHandler);
 
 //    esp_timer_dump(stdout);

@@ -20,14 +20,22 @@ const ERROR_LABELS = {
   "Invalid name": "Nom invalide",
   "Invalid seconds": "Temps de course invalide",
   "Invalid percent": "Position invalide",
-  "Invalid room": "Nom de pièce invalide"
+  "Invalid room": "Nom de pièce invalide",
+  "Invalid offset": "Décalage invalide",
+  "Invalid location": "Position invalide"
 };
+
+// Same limit as kSunMaxOffsetMinutes in include/sun_schedule.h.
+const SUN_MAX_OFFSET = 180;
+const SUN_OFFSET_STEP = 5;
 
 const elements = Object.fromEntries(
   ["connection", "open-settings", "devices-view", "devices", "empty", "drag-hint", "settings-view", "settings-error",
     "settings-form", "token", "command-key", "close-settings", "logout",
     "device-dialog", "device-form", "device-name", "device-room", "room-list", "device-time", "device-repeat", "device-error",
-    "device-cancel"].map((id) => [id, document.getElementById(id)])
+    "device-cancel", "device-sunrise", "device-sunrise-offset", "device-sunset", "device-sunset-offset",
+    "device-sun-hint", "location-section", "location-form", "location-error", "latitude", "longitude",
+    "use-position"].map((id) => [id, document.getElementById(id)])
 );
 
 let config = loadConfig();
@@ -36,6 +44,8 @@ let signingKey = null;
 let brokerConnected = false;
 let boardOnline = false;
 let devices = [];
+// Board location and today's sun times, from the state ("sun" in values).
+let sun = null;
 let editedDeviceId = null;
 let hiddenSince = 0;
 const pending = new Map();
@@ -67,8 +77,14 @@ function clearConfig() {
 
 // Text covered by the signature. Same construction as signedText() in src/cloud_mqtt.cpp.
 function signedText(id, ts, action, params) {
+  const offsetText = (offset) => (Number.isInteger(offset) ? String(offset) : "");
+  const text = (value) => (typeof value === "string" ? value : "");
   let value = "";
-  if (Number.isInteger(params.seconds)) {
+  if (action === "sun1W") {
+    value = `${offsetText(params.sunrise)},${offsetText(params.sunset)}`;
+  } else if (action === "location") {
+    value = `${text(params.latitude)},${text(params.longitude)}`;
+  } else if (Number.isInteger(params.seconds)) {
     value = String(params.seconds);
   } else if (typeof params.enabled === "boolean") {
     value = params.enabled ? "1" : "0";
@@ -467,6 +483,9 @@ function renderConnection() {
 
 function handleState(payload) {
   const list = payload && payload.values && payload.values.devices;
+  if (payload && payload.values && payload.values.sun) {
+    sun = payload.values.sun;
+  }
   if (Array.isArray(list)) {
     devices = list;
     renderDevices();
@@ -550,6 +569,69 @@ function showSettings(error) {
   elements.logout.hidden = !config;
   elements["settings-error"].textContent = error || "";
   elements["settings-error"].hidden = !error;
+  elements["location-section"].hidden = !config || Boolean(error);
+  elements.latitude.value = (sun && sun.latitude) || "";
+  elements.longitude.value = (sun && sun.longitude) || "";
+  elements["location-error"].hidden = true;
+}
+
+function showLocationError(text) {
+  elements["location-error"].textContent = text;
+  elements["location-error"].hidden = false;
+}
+
+function offsetLabel(minutes) {
+  if (minutes === 0) {
+    return "À l'heure";
+  }
+  return `${minutes > 0 ? "+" : "−"}${Math.abs(minutes)} min`;
+}
+
+// Offsets every SUN_OFFSET_STEP minutes, plus the current one if set off-step (serial console).
+function fillOffsetSelect(select, current) {
+  const values = [];
+  for (let minutes = -SUN_MAX_OFFSET; minutes <= SUN_MAX_OFFSET; minutes += SUN_OFFSET_STEP) {
+    values.push(minutes);
+  }
+  if (Number.isInteger(current) && !values.includes(current)) {
+    values.push(current);
+    values.sort((a, b) => a - b);
+  }
+  select.replaceChildren(...values.map((minutes) => {
+    const option = document.createElement("option");
+    option.value = String(minutes);
+    option.textContent = offsetLabel(minutes);
+    return option;
+  }));
+  select.value = String(Number.isInteger(current) ? current : 0);
+}
+
+function clockText(epoch) {
+  return new Date(epoch * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function sunHint() {
+  if (!sun || !sun.latitude) {
+    return "Position du boîtier non définie : réglez-la dans les réglages.";
+  }
+  if (Number.isInteger(sun.sunrise) && Number.isInteger(sun.sunset)) {
+    return `Aujourd'hui : lever ${clockText(sun.sunrise)}, coucher ${clockText(sun.sunset)}.`;
+  }
+  return "Heure du lever et du coucher pas encore connue.";
+}
+
+function renderSunControls() {
+  elements["device-sunrise-offset"].disabled = !elements["device-sunrise"].checked;
+  elements["device-sunset-offset"].disabled = !elements["device-sunset"].checked;
+}
+
+// Offset in minutes, or null when the action is off.
+function sunSetting(name) {
+  return elements[`device-${name}`].checked ? Number(elements[`device-${name}-offset`].value) : null;
+}
+
+function deviceSunOffset(device, name) {
+  return Number.isInteger(device[name]) ? device[name] : null;
 }
 
 async function start() {
@@ -573,6 +655,13 @@ function openDeviceDialog(deviceId) {
   }));
   elements["device-time"].value = device.travel_time;
   elements["device-repeat"].checked = Boolean(device.repeat);
+  for (const name of ["sunrise", "sunset"]) {
+    const offset = deviceSunOffset(device, name);
+    elements[`device-${name}`].checked = offset !== null;
+    fillOffsetSelect(elements[`device-${name}-offset`], offset);
+  }
+  renderSunControls();
+  elements["device-sun-hint"].textContent = sunHint();
   elements["device-error"].hidden = true;
   elements["device-dialog"].showModal();
 }
@@ -610,6 +699,42 @@ elements.logout.addEventListener("click", () => {
 });
 
 elements["device-cancel"].addEventListener("click", () => elements["device-dialog"].close());
+elements["device-sunrise"].addEventListener("change", renderSunControls);
+elements["device-sunset"].addEventListener("change", renderSunControls);
+
+elements["use-position"].addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    showLocationError("Localisation indisponible sur cet appareil.");
+    return;
+  }
+  elements["location-error"].hidden = true;
+  navigator.geolocation.getCurrentPosition((position) => {
+    // Four decimals are about 10 m, far more than sun times need.
+    elements.latitude.value = position.coords.latitude.toFixed(4);
+    elements.longitude.value = position.coords.longitude.toFixed(4);
+  }, () => showLocationError("Localisation refusée ou impossible."), { timeout: 15000 });
+});
+
+elements["location-form"].addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const latitude = elements.latitude.value.trim().replace(",", ".");
+  const longitude = elements.longitude.value.trim().replace(",", ".");
+  if (Boolean(latitude) !== Boolean(longitude)) {
+    showLocationError("Renseignez la latitude et la longitude, ou aucune des deux.");
+    return;
+  }
+  if (!commandsEnabled()) {
+    showLocationError("Boîtier hors ligne.");
+    return;
+  }
+  elements["location-error"].hidden = true;
+  const error = await sendCommand("location", { latitude, longitude });
+  if (error) {
+    showLocationError(error);
+  } else {
+    showDevices();
+  }
+});
 elements["device-form"].addEventListener("submit", async (event) => {
   event.preventDefault();
   const device = devices.find((entry) => entry.id === editedDeviceId);
@@ -639,6 +764,11 @@ elements["device-form"].addEventListener("submit", async (event) => {
   }
   if (room !== roomOf(device)) {
     commands.push(["room1W", { deviceId, room }]);
+  }
+  const sunrise = sunSetting("sunrise");
+  const sunset = sunSetting("sunset");
+  if (sunrise !== deviceSunOffset(device, "sunrise") || sunset !== deviceSunOffset(device, "sunset")) {
+    commands.push(["sun1W", { deviceId, sunrise, sunset }]);
   }
   elements["device-dialog"].close();
   if (commands.length === 0) {

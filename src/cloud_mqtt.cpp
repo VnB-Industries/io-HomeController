@@ -24,7 +24,7 @@
 #include <firmware_version.h>
 #include <iohcCryptoHelpers.h>
 #include <iohcRemote1W.h>
-#include <nvs_helpers.h>
+#include <sun_schedule.h>
 #include <utils.h>
 
 namespace {
@@ -151,6 +151,26 @@ std::string buildValues() {
         device["travel_time"] = r.travelTime;
         device["room"] = r.room;
         device["repeat"] = r.repeatOnNoResponse;
+        // Offset in minutes; left out when the sun action is off, to keep
+        // the state within kBufferSize.
+        if (r.sunrise) {
+            device["sunrise"] = r.sunriseOffset;
+        }
+        if (r.sunset) {
+            device["sunset"] = r.sunsetOffset;
+        }
+    }
+    JsonObject sun = doc["sun"].to<JsonObject>();
+    std::string latitude;
+    std::string longitude;
+    sunLocation(latitude, longitude);
+    sun["latitude"] = latitude;
+    sun["longitude"] = longitude;
+    time_t sunrise = 0;
+    time_t sunset = 0;
+    if (sunTimesToday(sunrise, sunset)) {
+        sun["sunrise"] = static_cast<long long>(sunrise);
+        sun["sunset"] = static_cast<long long>(sunset);
     }
     std::string values;
     serializeJson(doc, values);
@@ -175,8 +195,19 @@ void publishState(const std::string &values) {
 
 // Text covered by the signature. Same construction as signedText() in webapp/app.js.
 std::string signedText(const char *id, long long ts, const char *action, JsonObjectConst params) {
+    // An offset, or nothing when null.
+    const auto offsetText = [](JsonVariantConst offset) {
+        return offset.is<int>() ? std::to_string(offset.as<int>()) : std::string();
+    };
+    const auto text = [](JsonVariantConst value) {
+        return std::string(value.is<const char *>() ? value.as<const char *>() : "");
+    };
     std::string value;
-    if (params["seconds"].is<int>()) {
+    if (strcmp(action, "sun1W") == 0) {
+        value = offsetText(params["sunrise"]) + "," + offsetText(params["sunset"]);
+    } else if (strcmp(action, "location") == 0) {
+        value = text(params["latitude"]) + "," + text(params["longitude"]);
+    } else if (params["seconds"].is<int>()) {
         value = std::to_string(params["seconds"].as<int>());
     } else if (params["enabled"].is<bool>()) {
         value = params["enabled"].as<bool>() ? "1" : "0";
@@ -354,20 +385,7 @@ bool startClient() {
     return true;
 }
 
-void startTimeSync() {
-    std::string server;
-    if (!nvs_read_string(NVS_KEY_NET_SNTP, server) || server.empty()) {
-        server = "pool.ntp.org";
-    }
-    // Stored by configTime: the string must outlive this call.
-    static std::string s_ntpServer;
-    s_ntpServer = server;
-    configTime(0, 0, s_ntpServer.c_str());
-    Serial.printf("CloudMQTT: NTP sync with %s\n", s_ntpServer.c_str());
-}
-
 [[noreturn]] void cloudTask(void *) {
-    bool timeSyncStarted = false;
     uint32_t backoffMs = kBackoffMinMs;
     uint32_t nextAttemptMs = 0;
     uint32_t lastAttemptMs = 0;
@@ -387,9 +405,8 @@ void startTimeSync() {
         const uint32_t now = millis();
         const bool wifiUp = WiFi.status() == WL_CONNECTED;
 
-        if (wifiUp && !timeSyncStarted) {
-            startTimeSync();
-            timeSyncStarted = true;
+        if (wifiUp) {
+            startTimeSyncOnce();
         }
 
         if (s_client == nullptr) {

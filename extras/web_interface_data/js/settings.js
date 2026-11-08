@@ -355,6 +355,57 @@
         }
     }
 
+    function showLocation(app, config) {
+        app.elements.locationLatitudeInput.value = config.latitude || "";
+        app.elements.locationLongitudeInput.value = config.longitude || "";
+        let message;
+        if (!config.latitude) {
+            message = app.i18nText("status.location_not_set", "Not set: sun schedules are off");
+        } else if (Number.isInteger(config.sunrise) && Number.isInteger(config.sunset)) {
+            const time = function (epoch) {
+                return new Date(epoch * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            };
+            message = app.i18nText("status.location_sun_times", "Today: sunrise {sunrise}, sunset {sunset}")
+                .replace("{sunrise}", time(config.sunrise))
+                .replace("{sunset}", time(config.sunset));
+        } else if (config.clock_set === false) {
+            message = app.i18nText("status.location_no_clock", "Waiting for the clock (NTP)");
+        } else {
+            message = app.i18nText("status.location_no_sun", "No sunrise or sunset today");
+        }
+        app.elements.locationStatus.textContent = message;
+        app.elements.locationStatus.classList.remove("error");
+    }
+
+    async function loadLocationConfig(app) {
+        if (!app.elements.locationLatitudeInput) {
+            return;
+        }
+        try {
+            showLocation(app, await window.MiOpenApi.requestJson("/api/location"));
+        } catch (error) {
+            app.elements.locationStatus.textContent = error.message;
+            app.elements.locationStatus.classList.add("error");
+        }
+    }
+
+    async function updateLocationConfig(app) {
+        app.elements.locationUpdateButton.disabled = true;
+        try {
+            const result = await window.MiOpenApi.postJson("/api/location", {
+                latitude: app.elements.locationLatitudeInput.value.trim(),
+                longitude: app.elements.locationLongitudeInput.value.trim()
+            });
+            showLocation(app, result);
+            app.logStatus(result.message || "Location updated.");
+        } catch (error) {
+            app.elements.locationStatus.textContent = error.message;
+            app.elements.locationStatus.classList.add("error");
+        } finally {
+            app.elements.locationUpdateButton.disabled = false;
+        }
+    }
+
     async function loadSyslogConfig(app) {
         if (!app.elements.syslogServerInput) {
             return;
@@ -528,6 +579,12 @@
         };
         app.loadDisplayConfig = function () {
             return loadDisplayConfig(app);
+        };
+        app.loadLocationConfig = function () {
+            return loadLocationConfig(app);
+        };
+        app.updateLocationConfig = function () {
+            return updateLocationConfig(app);
         };
         app.updateDisplayConfig = function () {
             return updateDisplayConfig(app);

@@ -764,6 +764,11 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             }
 
             r.room = jobj["room"] | "";
+            // Present only when enabled; the value is the offset in minutes.
+            r.sunrise = jobj["sunrise"].is<int>();
+            r.sunriseOffset = static_cast<int16_t>(jobj["sunrise"] | 0);
+            r.sunset = jobj["sunset"].is<int>();
+            r.sunsetOffset = static_cast<int16_t>(jobj["sunset"] | 0);
             if (jobj["travel_time"].is<uint32_t>()) {
                 r.travelTime = jobj["travel_time"].as<uint32_t>();
             } else {
@@ -850,6 +855,12 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             jobj["travel_time"] = r.travelTime;
             if (!r.room.empty()) {
                 jobj["room"] = r.room;
+            }
+            if (r.sunrise) {
+                jobj["sunrise"] = r.sunriseOffset;
+            }
+            if (r.sunset) {
+                jobj["sunset"] = r.sunsetOffset;
             }
             jobj["position"] =
                 static_cast<int>(std::round(r.positionTracker.getPosition()));
@@ -1111,6 +1122,23 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
             return false;
         }
         it->room = room;
+        save();
+        return true;
+    }
+
+    bool iohcRemote1W::setSunSchedule(const std::string &description, bool sunrise, int sunriseOffset,
+                                      bool sunset, int sunsetOffset) {
+        auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
+            return e.description == description;
+        });
+        if (it == remotes.end()) {
+            Serial.printf("Device %s not found\n", description.c_str());
+            return false;
+        }
+        it->sunrise = sunrise;
+        it->sunriseOffset = static_cast<int16_t>(sunriseOffset);
+        it->sunset = sunset;
+        it->sunsetOffset = static_cast<int16_t>(sunsetOffset);
         save();
         return true;
     }

@@ -39,6 +39,8 @@ VARIOUS 1W (Use the description name in 1W.json as argument)
 - **del1W**    _Remove 1W device_
 - **edit1W**   _Edit 1W device name_
 - **time1W**   _Set 1W device travel time in seconds_
+- **room1W**   _Set 1W device room (empty clears it)_
+- **sun1W**    _Open at sunrise / close at sunset: `sun1W <description> <sunrise offset\|off> <sunset offset\|off>`, offsets in minutes (-180..180), e.g. `sun1W salon 0 20`_
 - **list1W**   _List 1W devices_
 
 COMMON
@@ -46,6 +48,7 @@ COMMON
 - **linkRemote** _Link device to remote map entry_
 - **unlinkRemote** _Remove device from remote map entry_
 - **delRemote** _Remove remote map entry_
+- **location**  _Board location for sun times: `location <latitude> <longitude>`, `location off`, or `location` to show it and today's sun times (UTC)_
 - **verbose**   _Toggle verbose output on packets list_
 - **help**      _This command_
 - **ls**        _List filesystem_

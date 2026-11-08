@@ -23,6 +23,7 @@
 #include <mqtt_handler.h>
 #include <nvs_helpers.h>
 #include <oled_display.h>
+#include <sun_schedule.h>
 #include <version_info.h>
 #include <WiFi.h>
 #include <wifi_helper.h>
@@ -220,6 +221,17 @@ void handleApiDevices(AsyncWebServerRequest *request, JsonArray &root) {
     deviceObj["room"] = r.room.c_str();
     deviceObj["paired"] = r.paired;
     deviceObj["repeatOnNoResponse"] = r.repeatOnNoResponse;
+    // Offset in minutes, null when the sun action is off.
+    if (r.sunrise) {
+      deviceObj["sunrise"] = r.sunriseOffset;
+    } else {
+      deviceObj["sunrise"] = nullptr;
+    }
+    if (r.sunset) {
+      deviceObj["sunset"] = r.sunsetOffset;
+    } else {
+      deviceObj["sunset"] = nullptr;
+    }
   }
 
   // Provide a generic command interface as last entry
@@ -506,6 +518,33 @@ void handleApiNetworkSet(AsyncWebServerRequest *request, JsonObject &doc, JsonOb
   root["dhcp"] = dhcp;
   root["hostname"] = hostname;
   scheduleRestart("net-reboot");
+}
+
+void handleApiLocationGet(AsyncWebServerRequest *request, JsonObject &root) {
+  std::string latitude;
+  std::string longitude;
+  sunLocation(latitude, longitude);
+  root["latitude"] = latitude;
+  root["longitude"] = longitude;
+  root["clock_set"] = clockIsSet();
+  time_t sunrise = 0;
+  time_t sunset = 0;
+  if (sunTimesToday(sunrise, sunset)) {
+    root["sunrise"] = static_cast<long long>(sunrise);
+    root["sunset"] = static_cast<long long>(sunset);
+  }
+}
+
+void handleApiLocationSet(AsyncWebServerRequest *request, JsonObject &doc, JsonObject &root) {
+  JsonDocument params;
+  params["latitude"] = doc["latitude"] | "";
+  params["longitude"] = doc["longitude"] | "";
+  const CommandResult result = handleCommand("location", params.as<JsonObjectConst>());
+  root["success"] = result.ok;
+  root["message"] = result.message.c_str();
+  if (result.ok) {
+    handleApiLocationGet(request, root);
+  }
 }
 
 void handleApiFallbackGet(AsyncWebServerRequest *request, JsonObject &root) {
@@ -1040,6 +1079,7 @@ void setupWebServer() {
   server.on("/api/wifi", HTTP_GET, jsonGet(handleApiWifiGet));
   server.on("/api/network", HTTP_GET, jsonGet(handleApiNetworkGet));
   server.on("/api/fallback", HTTP_GET, jsonGet(handleApiFallbackGet));
+  server.on("/api/location", HTTP_GET, jsonGet(handleApiLocationGet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_GET, jsonGet(handleApiDisplayGet));
 #endif
@@ -1054,6 +1094,7 @@ void setupWebServer() {
   server.on("/api/wifi", HTTP_POST, jsonPost(handleApiWifiSet));
   server.on("/api/network", HTTP_POST, jsonPost(handleApiNetworkSet));
   server.on("/api/fallback", HTTP_POST, jsonPost(handleApiFallbackSet));
+  server.on("/api/location", HTTP_POST, jsonPost(handleApiLocationSet));
 #if defined(SSD1306_DISPLAY)
   server.on("/api/display", HTTP_POST, jsonPost(handleApiDisplaySet));
 #endif

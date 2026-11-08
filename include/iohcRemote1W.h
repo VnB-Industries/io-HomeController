@@ -60,6 +60,12 @@ namespace IOHC {
             std::string room; // free text, empty when not assigned; groups devices in the apps
             uint32_t travelTime{}; // seconds to fully open or close
             bool repeatOnNoResponse{false};
+            // Open at sunrise / close at sunset, each shifted by its offset in
+            // minutes (negative = before the event). See sun_schedule.h.
+            bool sunrise{false};
+            int16_t sunriseOffset{0};
+            bool sunset{false};
+            int16_t sunsetOffset{0};
             BlindPosition positionTracker{};
             enum class Movement { Idle, Opening, Closing } movement{Movement::Idle};
             float lastPublishedPosition{0.0f};
@@ -86,6 +92,8 @@ namespace IOHC {
         bool renameRemote(const std::string &description, const std::string &name);
         bool setTravelTime(const std::string &description, uint32_t travelTime);
         bool setRoom(const std::string &description, const std::string &room);
+        bool setSunSchedule(const std::string &description, bool sunrise, int sunriseOffset,
+                            bool sunset, int sunsetOffset);
         bool setRepeatOnNoResponse(const std::string &description, bool repeatOnNoResponse);
         void updatePositions();
 

@@ -32,6 +32,8 @@ Le préfixe est `home/esp32lora`. Il est défini dans `src/cloud_mqtt.cpp` et da
 | `repeat1W` | `deviceId`, `enabled` (booléen) | Réessaie si le volet ne répond pas |
 | `edit1W` | `deviceId`, `name` (1 à 32 octets, sans caractère de contrôle) | Renomme le volet |
 | `room1W` | `deviceId`, `room` (0 à 32 octets, vide = aucune pièce) | Range le volet dans une pièce |
+| `sun1W` | `deviceId`, `sunrise`, `sunset` (décalage en minutes, -180 à 180, ou `null` = désactivé) | Ouvre au lever et ferme au coucher du soleil |
+| `location` | `latitude`, `longitude` (degrés décimaux en chaîne, ex. `"48.8566"`, au plus 12 caractères ; deux chaînes vides = effacer) | Position de la carte pour le calcul du soleil |
 
 L'appairage, la suppression, les réglages de la carte et la console restent accessibles uniquement en local.
 
@@ -47,7 +49,7 @@ deviceId
 valeur
 ```
 
-`valeur` vaut `seconds` en décimal, `1` ou `0` pour `enabled`, `name`, `percent` en décimal, `room`, ou une chaîne vide pour les autres commandes.
+`valeur` vaut `seconds` en décimal, `1` ou `0` pour `enabled`, `name`, `percent` en décimal, `room`, ou une chaîne vide pour les autres commandes. Pour `sun1W`, c'est `sunrise,sunset` avec chaque décalage en décimal ou vide s'il vaut `null` (ex. `-15,` ou `0,30`). Pour `location`, c'est `latitude,longitude` tels qu'envoyés.
 
 ## Ordre des contrôles sur la carte
 
@@ -78,10 +80,13 @@ Il est publié à la connexion, après chaque commande, quand les volets changen
   "fw": "1.0.0",
   "values": {
     "devices": [
-      { "id": "a1b2c3", "name": "Salon", "position": 40, "paired": true, "travel_time": 25, "repeat": false, "room": "Séjour" }
-    ]
+      { "id": "a1b2c3", "name": "Salon", "position": 40, "paired": true, "travel_time": 25, "repeat": false, "room": "Séjour", "sunset": 20 }
+    ],
+    "sun": { "latitude": "48.8566", "longitude": "2.3522", "sunrise": 1794127680, "sunset": 1794162000 }
   }
 }
 ```
 
 `position` est une estimation. Les clés d'appairage ne sont jamais publiées.
+
+`sunrise` et `sunset` d'un volet sont ses décalages en minutes ; une clé absente signifie que l'action est désactivée. Dans `sun`, `sunrise` et `sunset` sont les heures du jour (secondes Unix, UTC) ; ils manquent tant que l'horloge ou la position ne sont pas réglées, ou les jours sans lever ou coucher. L'action d'un volet part une fois par jour, à l'heure du lever ou du coucher plus son décalage, ou jusqu'à 10 minutes après (par exemple après un redémarrage).

@@ -28,6 +28,8 @@ static constexpr char NVS_KEY_FB_ENABLED[] = "fb_enabled";
 static constexpr char NVS_KEY_FB_BOOT[] = "fb_boot";
 static constexpr char NVS_KEY_FB_RUN[] = "fb_run";
 static constexpr char NVS_KEY_FB_TIMEOUT[] = "fb_timeout";
+static constexpr char NVS_KEY_SUN_LAT[] = "sun_lat";
+static constexpr char NVS_KEY_SUN_LON[] = "sun_lon";
 
 
 bool nvs_init();

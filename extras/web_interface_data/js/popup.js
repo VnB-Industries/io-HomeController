@@ -34,6 +34,11 @@
         const repeatRow = document.getElementById("popup-repeat-row");
         const repeatInput = document.getElementById("popup-repeat");
         const repeatLabel = document.getElementById("popup-repeat-label");
+        const sunRows = document.getElementById("popup-sun-rows");
+        const sunriseInput = document.getElementById("popup-sunrise");
+        const sunriseOffsetInput = document.getElementById("popup-sunrise-offset");
+        const sunsetInput = document.getElementById("popup-sunset");
+        const sunsetOffsetInput = document.getElementById("popup-sunset-offset");
         const contentText = document.getElementById("popup-content");
         const leftContent = document.getElementById("popup-content-left");
         const popupTitle = document.getElementById("popup-title");
@@ -75,6 +80,14 @@
         repeatInput.checked = !!popupOptions.defaultRepeatOnNoResponse;
         repeatLabel.textContent = popupOptions.repeatOnNoResponseLabel ||
             app.i18nText("popup.repeat_on_no_response", "Repeat command if shutter does not respond");
+
+        // Sun offsets are minutes, or null when the action is off.
+        const showSun = !!popupOptions.showSun;
+        sunRows.style.display = showSun ? "block" : "none";
+        sunriseInput.checked = Number.isInteger(popupOptions.defaultSunrise);
+        sunriseOffsetInput.value = Number.isInteger(popupOptions.defaultSunrise) ? popupOptions.defaultSunrise : 0;
+        sunsetInput.checked = Number.isInteger(popupOptions.defaultSunset);
+        sunsetOffsetInput.value = Number.isInteger(popupOptions.defaultSunset) ? popupOptions.defaultSunset : 0;
 
         const showInput = !!popupOptions.showInput;
         input.style.display = showInput ? "block" : "none";
@@ -213,9 +226,13 @@
             const timingValue = showTiming ? inputTiming.value : undefined;
             const deviceValue = showDevicePopup ? devicePopup.value : undefined;
             const repeatValue = showRepeat ? repeatInput.checked : undefined;
+            const sunValue = showSun ? {
+                sunrise: sunriseInput.checked ? parseInt(sunriseOffsetInput.value, 10) || 0 : null,
+                sunset: sunsetInput.checked ? parseInt(sunsetOffsetInput.value, 10) || 0 : null
+            } : undefined;
             closePopup();
             if (popupOptions.onSave) {
-                popupOptions.onSave(value, timingValue, deviceValue, repeatValue);
+                popupOptions.onSave(value, timingValue, deviceValue, repeatValue, sunValue);
             }
         };
 

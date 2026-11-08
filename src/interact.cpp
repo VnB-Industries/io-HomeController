@@ -23,6 +23,7 @@
 #include <wifi_helper.h>
 #include <oled_display.h>
 #include <iohcCryptoHelpers.h>
+#include <sun_schedule.h>
 #include <algorithm>
 #include <cstdlib>
 #if defined(MQTT)
@@ -68,7 +69,7 @@ void printMemoryReport() {
     static const char *const kTasks[] = {
         "loopTask", "WiFi_Worker", "handle_interrupt_task", "CallbackTask",
         "cloudMqtt", "mqtt_task", "async_tcp", "positionTracker",
-        "mqttScheduler", "DisplayTask", "versionInfo",
+        "mqttScheduler", "DisplayTask", "versionInfo", "sunSchedule",
     };
     Serial.println("Unused stack (bytes):");
     for (const char *name : kTasks) {
@@ -215,6 +216,64 @@ void createCommands() {
             room += (i > 2 ? " " : "") + cmd->at(i);
         }
         IOHC::iohcRemote1W::getInstance()->setRoom(cmd->at(1), room);
+    });
+    Cmd::addHandler((char *) "sun1W", (char *) "Open at sunrise/close at sunset: offset min or off", [](Tokens *cmd)-> void {
+        // "off", or an offset in minutes (negative = before the event).
+        const auto parse = [](const std::string &text, bool &enabled, int &offset) {
+            enabled = text != "off";
+            offset = 0;
+            if (!enabled) {
+                return true;
+            }
+            char *end = nullptr;
+            const long value = strtol(text.c_str(), &end, 10);
+            offset = static_cast<int>(value);
+            return !text.empty() && *end == '\0' && value >= -kSunMaxOffsetMinutes && value <= kSunMaxOffsetMinutes;
+        };
+        bool sunrise = false;
+        bool sunset = false;
+        int sunriseOffset = 0;
+        int sunsetOffset = 0;
+        if (cmd->size() < 4 || !parse(cmd->at(2), sunrise, sunriseOffset) || !parse(cmd->at(3), sunset, sunsetOffset)) {
+            Serial.printf("Usage: sun1W <description> <sunrise offset|off> <sunset offset|off>, offsets %d..%d min\n",
+                          -kSunMaxOffsetMinutes, kSunMaxOffsetMinutes);
+            return;
+        }
+        IOHC::iohcRemote1W::getInstance()->setSunSchedule(cmd->at(1), sunrise, sunriseOffset, sunset, sunsetOffset);
+    });
+    Cmd::addHandler((char *) "location", (char *) "Board location for sun times: <lat> <lon> | off", [](Tokens *cmd)-> void {
+        if (cmd->size() == 2 && cmd->at(1) == "off") {
+            setSunLocation("", "");
+        } else if (cmd->size() == 3) {
+            if (!setSunLocation(cmd->at(1), cmd->at(2))) {
+                Serial.println("Invalid location: decimal degrees, e.g. location 48.8566 2.3522");
+                return;
+            }
+        } else if (cmd->size() != 1) {
+            Serial.println("Usage: location [<latitude> <longitude> | off]");
+            return;
+        }
+        std::string latitude;
+        std::string longitude;
+        sunLocation(latitude, longitude);
+        if (latitude.empty()) {
+            Serial.println("Location not set");
+            return;
+        }
+        Serial.printf("Location %s, %s\n", latitude.c_str(), longitude.c_str());
+        time_t sunrise = 0;
+        time_t sunset = 0;
+        if (sunTimesToday(sunrise, sunset)) {
+            char rise[16];
+            char set[16];
+            strftime(rise, sizeof(rise), "%H:%M", gmtime(&sunrise));
+            strftime(set, sizeof(set), "%H:%M", gmtime(&sunset));
+            Serial.printf("Today sunrise %s UTC, sunset %s UTC\n", rise, set);
+        } else if (!clockIsSet()) {
+            Serial.println("Clock not set yet (NTP)");
+        } else {
+            Serial.println("No sunrise or sunset today");
+        }
     });
     Cmd::addHandler((char *) "time1W", (char *) "Set 1W device travel time", [](Tokens *cmd)-> void {
         if (cmd->size() < 3) {

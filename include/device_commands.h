@@ -18,6 +18,9 @@ struct CommandResult {
  *   time1W                { deviceId, seconds: 1..600 }
  *   repeat1W              { deviceId, enabled: bool }
  *   edit1W                { deviceId, name: 1..32 bytes, no control characters }
+ *   room1W                { deviceId, room: 0..32 bytes, no control characters }
+ *   sun1W                 { deviceId, sunrise, sunset: offset in minutes -180..180, or null = off }
+ *   location              { latitude, longitude: decimal strings, both empty = clear }
  */
 CommandResult handleCommand(const char *action, JsonObjectConst params);
 

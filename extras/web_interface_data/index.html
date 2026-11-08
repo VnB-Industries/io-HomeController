@@ -172,6 +172,19 @@
                         <p id="display-status" class="setting-status" data-i18n="status.display_loading">Display settings loading...</p>
                     </div>
                 </section>
+                <section id="location-settings-section">
+                    <div class="title">
+                        <h2 data-i18n="section.location_settings">Location (sunrise / sunset)</h2>
+                    </div>
+                    <div class="card">
+                        <label for="location-latitude" data-i18n="label.latitude">Latitude:</label>
+                        <input type="text" id="location-latitude" inputmode="decimal" placeholder="48.8566">
+                        <label for="location-longitude" data-i18n="label.longitude">Longitude:</label>
+                        <input type="text" id="location-longitude" inputmode="decimal" placeholder="2.3522">
+                        <button id="location-update" data-i18n="button.update">Update</button>
+                        <p id="location-status" class="setting-status"></p>
+                    </div>
+                </section>
                 <section id="syslog-settings-section">
                     <div class="title">
                         <h2 data-i18n="section.syslog_settings">Syslog settings</h2>
@@ -313,6 +326,20 @@
                         <span id="popup-repeat-label" data-i18n="popup.repeat_on_no_response">Herhaal commando als rolluik niet reageert</span>
                         <input type="checkbox" id="popup-repeat">
                     </label>
+                    <div id="popup-sun-rows" style="display:none;">
+                        <label style="display:flex; gap:8px; align-items:center;">
+                            <input type="checkbox" id="popup-sunrise">
+                            <span data-i18n="popup.sunrise">Open at sunrise</span>
+                            <input type="number" id="popup-sunrise-offset" min="-180" max="180" step="1" style="width:5em;">
+                            <span data-i18n="popup.offset_minutes">min</span>
+                        </label>
+                        <label style="display:flex; gap:8px; align-items:center;">
+                            <input type="checkbox" id="popup-sunset">
+                            <span data-i18n="popup.sunset">Close at sunset</span>
+                            <input type="number" id="popup-sunset-offset" min="-180" max="180" step="1" style="width:5em;">
+                            <span data-i18n="popup.offset_minutes">min</span>
+                        </label>
+                    </div>
                     <label for="select-device" class="device-popup-label" data-i18n="popup.device_select">device-select:</label>
                     <select id="popup-device-select" class="device-popup">
                         <!-- Options will be populated by JavaScript -->

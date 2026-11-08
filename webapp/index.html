@@ -48,6 +48,22 @@
         <button id="close-settings" type="button" hidden>Fermer</button>
         <button id="logout" class="danger" type="button" hidden>Se déconnecter</button>
       </form>
+
+      <div id="location-section" hidden>
+        <h2>Position du boîtier</h2>
+        <p class="lead">Sert à calculer le lever et le coucher du soleil.</p>
+        <p id="location-error" class="error" role="alert" hidden></p>
+        <form id="location-form" novalidate>
+          <label>Latitude
+            <input id="latitude" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="48.8566">
+          </label>
+          <label>Longitude
+            <input id="longitude" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="2.3522">
+          </label>
+          <button id="use-position" type="button">Utiliser ma position</button>
+          <button class="primary" type="submit">Enregistrer la position</button>
+        </form>
+      </div>
     </section>
   </main>
 
@@ -68,6 +84,21 @@
         <input id="device-repeat" type="checkbox">
         Réessayer si le volet ne répond pas
       </label>
+      <div class="sun-rule">
+        <label class="checkbox">
+          <input id="device-sunrise" type="checkbox">
+          Ouvrir au lever du soleil
+        </label>
+        <select id="device-sunrise-offset" aria-label="Décalage par rapport au lever du soleil"></select>
+      </div>
+      <div class="sun-rule">
+        <label class="checkbox">
+          <input id="device-sunset" type="checkbox">
+          Fermer au coucher du soleil
+        </label>
+        <select id="device-sunset-offset" aria-label="Décalage par rapport au coucher du soleil"></select>
+      </div>
+      <p id="device-sun-hint" class="sun-hint"></p>
       <p id="device-error" class="error" role="alert" hidden></p>
       <div class="sheet-actions">
         <button id="device-cancel" type="button">Annuler</button>

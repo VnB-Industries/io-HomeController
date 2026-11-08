@@ -303,7 +303,7 @@ form { display: grid; gap: 14px; }
 label { display: grid; gap: 6px; font-weight: 650; }
 label.checkbox { grid-template-columns: 24px 1fr; align-items: center; gap: 10px; min-height: 44px; font-weight: 450; }
 
-input:not([type="checkbox"]) {
+input:not([type="checkbox"]), select {
   width: 100%;
   min-height: 48px;
   padding: 10px 12px;
@@ -333,6 +333,11 @@ dialog[open] { animation: sheet-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
 dialog::backdrop { background: rgb(8 14 20 / 55%); }
 dialog h2 { margin-bottom: 4px; font-size: 22px; }
 dialog input:not([type="checkbox"]) { background: var(--facade); }
+
+dialog select { width: auto; background: var(--facade); }
+.sun-rule { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+.sun-hint { color: var(--muted); font-size: 14px; }
+#location-section { margin-top: 36px; }
 
 .sheet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
 

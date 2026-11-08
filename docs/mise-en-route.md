@@ -30,7 +30,7 @@ La seconde commande sert à `CLOUD_COMMAND_KEY`.
 
 La carte doit avoir son antenne vissée avant tout démarrage.
 
-Attention : `uploadfs` remplace `1W.json`, qui contient les clés d'appairage. Si des volets sont déjà appairés, sauvegardez d'abord ce fichier avec « Download Devices ».
+`uploadfs` conserve les volets et télécommandes de la carte : avant de construire l'image, `tools/prepare_fs.py` télécharge `1W.json` (clés d'appairage) et `RemoteMap.json` depuis la carte dans `config/`, puis les met dans l'image. Si la carte est injoignable, il reprend la copie déjà présente dans `config/`, et prévient s'il n'y en a aucune. `config/` n'est pas versionné : le dépôt est public.
 
 ```bash
 pio run -e HeltecLoraV2ESP32 -t upload

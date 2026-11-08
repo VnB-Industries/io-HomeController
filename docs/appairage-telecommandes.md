@@ -47,4 +47,4 @@ Facultatif. Le nom remplace l'adresse dans le journal et sur l'écran.
 
 ## Sauvegarde
 
-Les clés d'appairage sont dans `1W.json`. `uploadfs` écrase ce fichier. Faire « Download Devices » avant toute mise à jour du système de fichiers.
+Les clés d'appairage sont dans `1W.json`. Une copie est gardée dans `config/` (non versionné) et remise automatiquement dans l'image à chaque `uploadfs`. Pour une sauvegarde hors du projet, « Download Devices ».

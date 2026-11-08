@@ -57,6 +57,10 @@
       <label>Nom
         <input id="device-name" maxlength="32" required>
       </label>
+      <label>Pièce
+        <input id="device-room" list="room-list" maxlength="32" autocomplete="off" placeholder="Aucune">
+      </label>
+      <datalist id="room-list"></datalist>
       <label>Temps de course (secondes)
         <input id="device-time" type="number" inputmode="numeric" min="1" max="600" step="1" required>
       </label>

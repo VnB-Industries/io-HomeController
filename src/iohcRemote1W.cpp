@@ -15,6 +15,7 @@
  */
 
 #include <iohcRemote1W.h>
+#include <iohcRemoteMap.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
@@ -663,6 +664,24 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                     break;
                 }
         }
+
+        // A device of this box paired to several motors drives a group: the
+        // devices linked to its own address in the remote map (or "ALL")
+        // follow the same action, so their estimated positions stay right.
+        if (cmd == RemoteButton::Open || cmd == RemoteButton::Close ||
+            cmd == RemoteButton::Stop || cmd == RemoteButton::Position) {
+            int percent = -1;
+            if (cmd == RemoteButton::Position) {
+                const int index = (data->size() > 2) ? 2 : 0;
+                percent = std::clamp(atoi(data->at(index).c_str()), 0, 100);
+            }
+            const std::string self = r.description;
+            iohcRemoteMap::getInstance()->forEachLinkedDevice(r.node, [&](const std::string &linked) {
+                if (linked != self) {
+                    handleRemoteAction(cmd, linked, percent);
+                }
+            });
+        }
         this->save(); // Save sequence number
     }
 
@@ -744,6 +763,7 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
                 updateFile = true;
             }
 
+            r.room = jobj["room"] | "";
             if (jobj["travel_time"].is<uint32_t>()) {
                 r.travelTime = jobj["travel_time"].as<uint32_t>();
             } else {
@@ -828,6 +848,9 @@ Every 9 -> 0x20 12:41:28.171 > (23) 1W S 1 E 1  FROM B60D1A TO 00003F CMD 20 <  
             jobj["name"] = r.name;
 
             jobj["travel_time"] = r.travelTime;
+            if (!r.room.empty()) {
+                jobj["room"] = r.room;
+            }
             jobj["position"] =
                 static_cast<int>(std::round(r.positionTracker.getPosition()));
 
@@ -976,7 +999,7 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         return true;
     }
 
-    void iohcRemote1W::handleRemoteAction(RemoteButton cmd, const std::string &description) {
+    void iohcRemote1W::handleRemoteAction(RemoteButton cmd, const std::string &description, int percent) {
         auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
             return e.description == description;
         });
@@ -1030,6 +1053,36 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
                 }
 #endif
                 break;
+            case RemoteButton::Position: {
+                if (percent < 0) {
+                    break;
+                }
+                const float current = r.positionTracker.getPosition();
+                const char *state = "STOP";
+                if (percent > current + 0.5f) {
+                    r.positionTracker.startOpening();
+                    r.movement = remote::Movement::Opening;
+                    state = "OPENING";
+                } else if (percent < current - 0.5f) {
+                    r.positionTracker.startClosing();
+                    r.movement = remote::Movement::Closing;
+                    state = "CLOSING";
+                } else {
+                    r.positionTracker.stop();
+                    r.movement = remote::Movement::Idle;
+                }
+                r.targetPosition = static_cast<float>(percent);
+#if defined(MQTT)
+                {
+                    std::string id = bytesToHexString(r.node, sizeof(r.node));
+                    publishCoverState(id, state);
+                    publishCoverPosition(id, r.positionTracker.getPosition());
+                    r.lastPublishedState = state;
+                    r.lastPublishedPosition = r.positionTracker.getPosition();
+                }
+#endif
+                break;
+            }
             default:
                 break;
         }
@@ -1045,6 +1098,19 @@ const std::vector<iohcRemote1W::remote>& iohcRemote1W::getRemotes() const {
         }
         it->travelTime = travelTime;
         it->positionTracker.setTravelTime(travelTime);
+        save();
+        return true;
+    }
+
+    bool iohcRemote1W::setRoom(const std::string &description, const std::string &room) {
+        auto it = std::find_if(remotes.begin(), remotes.end(), [&](const remote &e) {
+            return e.description == description;
+        });
+        if (it == remotes.end()) {
+            Serial.printf("Device %s not found\n", description.c_str());
+            return false;
+        }
+        it->room = room;
         save();
         return true;
     }

@@ -57,6 +57,7 @@ namespace IOHC {
             bool paired{false};
             std::string description;
             std::string name;
+            std::string room; // free text, empty when not assigned; groups devices in the apps
             uint32_t travelTime{}; // seconds to fully open or close
             bool repeatOnNoResponse{false};
             BlindPosition positionTracker{};
@@ -71,7 +72,8 @@ namespace IOHC {
         ~iohcRemote1W() override = default;
 
         void cmd(RemoteButton cmd, Tokens* data);
-        void handleRemoteAction(RemoteButton cmd, const std::string &description);
+        // percent is the target for RemoteButton::Position, ignored otherwise.
+        void handleRemoteAction(RemoteButton cmd, const std::string &description, int percent = -1);
         bool load() override;
         bool save() override;
 //        void scanDump() override { }
@@ -83,6 +85,7 @@ namespace IOHC {
         bool removeRemote(const std::string &description);
         bool renameRemote(const std::string &description, const std::string &name);
         bool setTravelTime(const std::string &description, uint32_t travelTime);
+        bool setRoom(const std::string &description, const std::string &room);
         bool setRepeatOnNoResponse(const std::string &description, bool repeatOnNoResponse);
         void updatePositions();
 

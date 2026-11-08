@@ -469,7 +469,9 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                 }
                 doc["action"] = action;
                 display1WAction(iohc->payload.packet.header.source, action, "RX");
-                if (const auto *map = remoteMap->find(iohc->payload.packet.header.source)) {
+                // Frames from this box's own devices are skipped: their group is
+                // applied where the command is sent (iohcRemote1W::cmd).
+                if (rit == remotes.end() && remoteMap->find(iohc->payload.packet.header.source)) {
                     IOHC::RemoteButton btn;
                     bool recognized = true;
                     if (!strcmp(action, "OPEN")) btn = IOHC::RemoteButton::Open;
@@ -480,9 +482,9 @@ bool msgRcvd(IOHC::iohcPacket *iohc) {
                     else recognized = false; // unsupported 1W command - ignore, don't dispatch as a phantom Stop
 
                     if (recognized) {
-                        for (const auto &desc : map->devices) {
+                        remoteMap->forEachLinkedDevice(iohc->payload.packet.header.source, [&](const std::string &desc) {
                             iohcRemote1W::getInstance()->handleRemoteAction(btn, desc);
-                        }
+                        });
                     }
                 }
             } else {

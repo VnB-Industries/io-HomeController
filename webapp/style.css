@@ -161,6 +161,18 @@ button:not(:disabled):active { background: color-mix(in srgb, var(--signal) 22%,
 
 .device { min-width: 0; }
 
+/* One heading per room, across the whole row of windows. */
+.room-header {
+  grid-column: 1 / -1;
+  margin: 12px 0 -8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.room-header:first-child { margin-top: 0; }
+
 .window {
   --closed: 1;
   --target: 0;

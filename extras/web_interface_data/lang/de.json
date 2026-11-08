@@ -108,6 +108,7 @@
   "popup.help_remote": "Hilfe Remote",
   "popup.add_device_title": "Geraet hinzufuegen",
   "popup.new_device": "Neues Geraet",
+  "popup.all_devices": "Alle Geräte",
   "popup.here_add_device": "Add your device here",
   "popup.add_remote_title": "Remote hinzufuegen",
   "popup.remote_id_label": "Remote ID:",

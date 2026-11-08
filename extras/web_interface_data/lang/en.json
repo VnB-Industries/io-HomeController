@@ -116,6 +116,7 @@
   "popup.help_remote": "Help remote",
   "popup.add_device_title": "Add Device",
   "popup.new_device": "New device",
+  "popup.all_devices": "All devices",
   "popup.here_add_device": "Add your device here",
   "popup.add_remote_title": "Add Remote",
   "popup.remote_id_label": "Remote ID:",

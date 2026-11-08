@@ -72,6 +72,29 @@ namespace IOHC {
         return _entries;
     }
 
+    void iohcRemoteMap::forEachLinkedDevice(const address node,
+                                            const std::function<void(const std::string &)> &fn) const {
+        const entry *e = find(node);
+        if (!e) {
+            return;
+        }
+        if (std::find(e->devices.begin(), e->devices.end(), kAllDevices) != e->devices.end()) {
+            // Copied: fn may update the devices while we iterate.
+            std::vector<std::string> all;
+            for (const auto &r : iohcRemote1W::getInstance()->getRemotes()) {
+                all.push_back(r.description);
+            }
+            for (const auto &d : all) {
+                fn(d);
+            }
+            return;
+        }
+        const std::vector<std::string> linked = e->devices;
+        for (const auto &d : linked) {
+            fn(d);
+        }
+    }
+
     bool iohcRemoteMap::save() {
         fs::File f = LittleFS.open(REMOTE_MAP_FILE, "w");
         if (!f) {

@@ -3,6 +3,7 @@
 
 #include <iohcPacket.h>
 #include <vector>
+#include <functional>
 #include <string>
 
 #define REMOTE_MAP_FILE "/RemoteMap.json"
@@ -27,6 +28,10 @@ namespace IOHC {
         bool renameDevice(const address node, const std::string &name);
         bool remove(const address node);
         const std::vector<entry>& getEntries() const;
+        // Calls fn once per device description linked to node. The link
+        // kAllDevices stands for every 1W device, including ones added later.
+        void forEachLinkedDevice(const address node, const std::function<void(const std::string &)> &fn) const;
+        static constexpr const char *kAllDevices = "ALL";
 
     private:
         iohcRemoteMap();

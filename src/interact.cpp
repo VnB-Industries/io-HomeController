@@ -205,6 +205,17 @@ void createCommands() {
         }
         IOHC::iohcRemote1W::getInstance()->renameRemote(cmd->at(1), name);
     });
+    Cmd::addHandler((char *) "room1W", (char *) "Set 1W device room (empty clears it)", [](Tokens *cmd)-> void {
+        if (cmd->size() < 2) {
+            Serial.println("Usage: room1W <description> [room]");
+            return;
+        }
+        std::string room;
+        for (size_t i = 2; i < cmd->size(); ++i) {
+            room += (i > 2 ? " " : "") + cmd->at(i);
+        }
+        IOHC::iohcRemote1W::getInstance()->setRoom(cmd->at(1), room);
+    });
     Cmd::addHandler((char *) "time1W", (char *) "Set 1W device travel time", [](Tokens *cmd)-> void {
         if (cmd->size() < 3) {
             Serial.println("Usage: time1W <description> <seconds>");

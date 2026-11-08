@@ -116,6 +116,7 @@
   "popup.help_remote": "Help remote",
   "popup.add_device_title": "Scherm toevoegen",
   "popup.new_device": "Nieuw scherm",
+  "popup.all_devices": "Alle apparaten",
   "popup.here_add_device": "Voeg hier je scherm toe",
   "popup.add_remote_title": "Remote toevoegen",
   "popup.remote_id_label": "Remote ID:",

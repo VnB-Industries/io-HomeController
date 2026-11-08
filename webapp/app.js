@@ -19,13 +19,14 @@ const ERROR_LABELS = {
   "Invalid action": "Commande refusée",
   "Invalid name": "Nom invalide",
   "Invalid seconds": "Temps de course invalide",
-  "Invalid percent": "Position invalide"
+  "Invalid percent": "Position invalide",
+  "Invalid room": "Nom de pièce invalide"
 };
 
 const elements = Object.fromEntries(
   ["connection", "open-settings", "devices-view", "devices", "empty", "drag-hint", "settings-view", "settings-error",
     "settings-form", "token", "command-key", "close-settings", "logout",
-    "device-dialog", "device-form", "device-name", "device-time", "device-repeat", "device-error",
+    "device-dialog", "device-form", "device-name", "device-room", "room-list", "device-time", "device-repeat", "device-error",
     "device-cancel"].map((id) => [id, document.getElementById(id)])
 );
 
@@ -75,6 +76,8 @@ function signedText(id, ts, action, params) {
     value = params.name;
   } else if (Number.isInteger(params.percent)) {
     value = String(params.percent);
+  } else if (typeof params.room === "string") {
+    value = params.room;
   }
   return [id, ts, action, params.deviceId || "", value].join("\n");
 }
@@ -230,12 +233,64 @@ function renderDevices() {
     pane.setAttribute("aria-valuenow", String(position));
     pane.setAttribute("aria-valuetext", `${position} % ouvert`);
   }
-  for (const item of Array.from(elements.devices.children)) {
+  for (const item of Array.from(elements.devices.querySelectorAll(".device"))) {
     if (!seen.has(item.dataset.id)) {
       item.remove();
     }
   }
+  arrangeByRoom();
   renderCommandAvailability();
+}
+
+const NO_ROOM_LABEL = "Sans pièce";
+
+function roomOf(device) {
+  return (device.room || "").trim();
+}
+
+function roomNames() {
+  return [...new Set(devices.map(roomOf).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
+}
+
+function roomHeader(room) {
+  const existing = [...elements.devices.querySelectorAll(".room-header")].find((header) => header.dataset.room === room);
+  if (existing) {
+    return existing;
+  }
+  const header = document.createElement("li");
+  header.className = "room-header";
+  header.dataset.room = room;
+  header.textContent = room || NO_ROOM_LABEL;
+  return header;
+}
+
+// Rooms in alphabetical order, shutters without a room last. Without any
+// room the façade stays a plain grid, as before rooms existed.
+function arrangeByRoom() {
+  const rooms = roomNames();
+  const order = devices.some((device) => !roomOf(device)) ? [...rooms, ""] : rooms;
+  const wanted = [];
+  for (const room of order) {
+    if (rooms.length > 0) {
+      wanted.push(roomHeader(room));
+    }
+    devices
+      .filter((device) => roomOf(device) === room)
+      .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }))
+      .forEach((device) => wanted.push(findItem(device.id)));
+  }
+  for (const header of elements.devices.querySelectorAll(".room-header")) {
+    if (!wanted.includes(header)) {
+      header.remove();
+    }
+  }
+  // Move only what is out of place, so a window being dragged keeps its pointer.
+  wanted.forEach((node, index) => {
+    if (elements.devices.children[index] !== node) {
+      elements.devices.insertBefore(node, elements.devices.children[index] || null);
+    }
+  });
 }
 
 function commitTarget(deviceId, percent) {
@@ -510,6 +565,12 @@ function openDeviceDialog(deviceId) {
   }
   editedDeviceId = deviceId;
   elements["device-name"].value = device.name;
+  elements["device-room"].value = roomOf(device);
+  elements["room-list"].replaceChildren(...roomNames().map((room) => {
+    const option = document.createElement("option");
+    option.value = room;
+    return option;
+  }));
   elements["device-time"].value = device.travel_time;
   elements["device-repeat"].checked = Boolean(device.repeat);
   elements["device-error"].hidden = true;
@@ -560,6 +621,7 @@ elements["device-form"].addEventListener("submit", async (event) => {
   const name = elements["device-name"].value.trim();
   const seconds = Number(elements["device-time"].value);
   const repeat = elements["device-repeat"].checked;
+  const room = elements["device-room"].value.trim();
   if (!name || !Number.isInteger(seconds) || seconds < 1 || seconds > 600) {
     elements["device-error"].textContent = "Nom requis, temps de course entre 1 et 600 secondes.";
     elements["device-error"].hidden = false;
@@ -574,6 +636,9 @@ elements["device-form"].addEventListener("submit", async (event) => {
   }
   if (repeat !== Boolean(device.repeat)) {
     commands.push(["repeat1W", { deviceId, enabled: repeat }]);
+  }
+  if (room !== roomOf(device)) {
+    commands.push(["room1W", { deviceId, room }]);
   }
   elements["device-dialog"].close();
   if (commands.length === 0) {

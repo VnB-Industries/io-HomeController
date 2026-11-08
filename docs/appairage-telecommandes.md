@@ -45,6 +45,16 @@ Facultatif. Le nom remplace l'adresse dans le journal et sur l'écran.
 3. Onglet Télécommandes, ajouter avec cette adresse (pré-remplie). En série : `newRemote 1A2B3C Télécommande salon`.
 4. Lier les volets qu'elle commande : `linkRemote 1A2B3C QWER`.
 
+## Une télécommande ou un appareil qui commande plusieurs volets
+
+Une télécommande « tous les volets » se lie à « Tous les volets » (`linkRemote 1A2B3C ALL`) : chaque appui met à jour la position de tous les volets, y compris ceux ajoutés plus tard. On peut aussi lier plusieurs volets un par un.
+
+Un appareil du boîtier appairé à plusieurs moteurs (un groupe) se déclare de la même façon : ajouter une télécommande avec l'ID de cet appareil (affiché dans Appareils), puis la lier aux volets du groupe ou à « Tous les volets ». Les commandes envoyées depuis cet appareil, positions comprises, mettent alors à jour ces volets.
+
+## Pièces
+
+Dans l'app iPhone, la fiche d'un volet a un champ « Pièce ». Taper un nouveau nom crée la pièce ; les pièces existantes sont proposées. Les volets s'affichent regroupés par pièce, ceux sans pièce à la fin. En série : `room1W QWER Salon` (sans nom de pièce pour la retirer).
+
 ## Sauvegarde
 
 Les clés d'appairage sont dans `1W.json`. Une copie est gardée dans `config/` (non versionné) et remise automatiquement dans l'image à chaque `uploadfs`. Pour une sauvegarde hors du projet, « Download Devices ».

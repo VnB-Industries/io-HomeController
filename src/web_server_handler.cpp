@@ -55,6 +55,7 @@ static void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       JsonObject d = devices.add<JsonObject>();
       d["id"] = bytesToHexString(r.node, sizeof(r.node)).c_str();
       d["name"] = r.name.c_str();
+      d["room"] = r.room.c_str();
       d["position"] = r.positionTracker.getPosition();
     }
 

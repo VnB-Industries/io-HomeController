@@ -43,6 +43,11 @@ bool isValidName(const char *name) {
     });
 }
 
+// A room may be empty (no room); otherwise the same rules as a name.
+bool isValidRoom(const char *room) {
+    return room[0] == '\0' || isValidName(room);
+}
+
 bool toButton(const char *action, IOHC::RemoteButton &button) {
     if (strcmp(action, "open") == 0) {
         button = IOHC::RemoteButton::Open;
@@ -65,7 +70,7 @@ CommandResult handleCommand(const char *action, JsonObjectConst params) {
     const bool isButton = toButton(action, button);
     const bool isPosition = strcmp(action, "position") == 0;
     const bool isSetting = strcmp(action, "time1W") == 0 || strcmp(action, "repeat1W") == 0 ||
-                           strcmp(action, "edit1W") == 0;
+                           strcmp(action, "edit1W") == 0 || strcmp(action, "room1W") == 0;
     if (!isButton && !isPosition && !isSetting) {
         return {false, "Invalid action"};
     }
@@ -123,6 +128,14 @@ CommandResult handleCommand(const char *action, JsonObjectConst params) {
             return {false, "Could not set travel time"};
         }
         result.message = "Travel time updated";
+    } else if (strcmp(action, "room1W") == 0) {
+        if (!params["room"].is<const char *>() || !isValidRoom(params["room"].as<const char *>())) {
+            return {false, "Invalid room"};
+        }
+        if (!remotes->setRoom(description, params["room"].as<const char *>())) {
+            return {false, "Could not set room"};
+        }
+        result.message = "Room updated";
     } else if (strcmp(action, "repeat1W") == 0) {
         if (!params["enabled"].is<bool>()) {
             return {false, "Invalid enabled"};

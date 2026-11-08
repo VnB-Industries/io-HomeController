@@ -49,6 +49,13 @@
         devicePopup.style.display = showDevicePopup ? "block" : "none";
         devicePopup.textContent = "";
         if (showDevicePopup) {
+            if (popupOptions.allowAllDevices) {
+                // "ALL" links every device, including ones added later.
+                const allOption = document.createElement("option");
+                allOption.value = "ALL";
+                allOption.textContent = app.i18nText("popup.all_devices", "All devices");
+                devicePopup.appendChild(allOption);
+            }
             app.state.devicesCache.forEach(function (device) {
                 const option = document.createElement("option");
                 option.value = device.id;

@@ -149,6 +149,7 @@ std::string buildValues() {
         device["position"] = static_cast<int>(r.positionTracker.getPosition());
         device["paired"] = r.paired;
         device["travel_time"] = r.travelTime;
+        device["room"] = r.room;
         device["repeat"] = r.repeatOnNoResponse;
     }
     std::string values;
@@ -183,6 +184,8 @@ std::string signedText(const char *id, long long ts, const char *action, JsonObj
         value = params["name"].as<const char *>();
     } else if (params["percent"].is<int>()) {
         value = std::to_string(params["percent"].as<int>());
+    } else if (params["room"].is<const char *>()) {
+        value = params["room"].as<const char *>();
     }
     const char *deviceId = params["deviceId"].is<const char *>() ? params["deviceId"].as<const char *>() : "";
     return std::string(id) + "\n" + std::to_string(ts) + "\n" + action + "\n" + deviceId + "\n" + value;

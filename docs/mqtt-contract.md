@@ -31,6 +31,7 @@ Le préfixe est `home/esp32lora`. Il est défini dans `src/cloud_mqtt.cpp` et da
 | `time1W` | `deviceId`, `seconds` (1 à 600) | Règle le temps de course |
 | `repeat1W` | `deviceId`, `enabled` (booléen) | Réessaie si le volet ne répond pas |
 | `edit1W` | `deviceId`, `name` (1 à 32 octets, sans caractère de contrôle) | Renomme le volet |
+| `room1W` | `deviceId`, `room` (0 à 32 octets, vide = aucune pièce) | Range le volet dans une pièce |
 
 L'appairage, la suppression, les réglages de la carte et la console restent accessibles uniquement en local.
 
@@ -46,7 +47,7 @@ deviceId
 valeur
 ```
 
-`valeur` vaut `seconds` en décimal, `1` ou `0` pour `enabled`, `name`, `percent` en décimal, ou une chaîne vide pour les autres commandes.
+`valeur` vaut `seconds` en décimal, `1` ou `0` pour `enabled`, `name`, `percent` en décimal, `room`, ou une chaîne vide pour les autres commandes.
 
 ## Ordre des contrôles sur la carte
 
@@ -77,7 +78,7 @@ Il est publié à la connexion, après chaque commande, quand les volets changen
   "fw": "1.0.0",
   "values": {
     "devices": [
-      { "id": "a1b2c3", "name": "Salon", "position": 40, "paired": true, "travel_time": 25, "repeat": false }
+      { "id": "a1b2c3", "name": "Salon", "position": 40, "paired": true, "travel_time": 25, "repeat": false, "room": "Séjour" }
     ]
   }
 }

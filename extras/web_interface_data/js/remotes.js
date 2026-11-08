@@ -5,6 +5,9 @@
         }
 
         return remote.devices.map(function (deviceRef) {
+            if (deviceRef === "ALL") {
+                return app.i18nText("popup.all_devices", "All devices");
+            }
             const device = app.state.devicesCache.find(function (candidate) {
                 return candidate.id === deviceRef ||
                     candidate.name === deviceRef ||
@@ -82,6 +85,7 @@
             {
                 showInput: true,
                 showDevicePopup: true,
+                allowAllDevices: true,
                 btnShowDelete: true,
                 showSave: true,
                 defaultValue: remoteName,

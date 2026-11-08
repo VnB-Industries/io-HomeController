@@ -99,6 +99,9 @@ void createCommands() {
     Cmd::addHandler((char *) "mem", (char *) "Show heap and per-task unused stack", [](Tokens *cmd)-> void {
         printMemoryReport();
     });
+    Cmd::addHandler((char *) "net", (char *) "Show WiFi state, addresses and router reachability", [](Tokens *cmd)-> void {
+        printNetworkReport();
+    });
     // Atlantic 2W
     Cmd::addHandler((char *) "powerOn", (char *) "Permit to retrieve paired devices", [](Tokens *cmd)-> void {
         IOHC::iohcCozyDevice2W::getInstance()->cmd(IOHC::DeviceButton::powerOn, nullptr);
@@ -249,7 +252,7 @@ void createCommands() {
         IOHC::iohcRemoteMap::getInstance()->add(node, name);
     });
     Cmd::addHandler((char *) "editRemote", (char *) "Edit remote name", [](Tokens *cmd)-> void {
-        if (cmd->size() < 2) {
+        if (cmd->size() < 3) {
             Serial.println("Usage: editRemote <address> <name>");
             return;
         }

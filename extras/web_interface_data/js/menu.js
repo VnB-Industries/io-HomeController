@@ -24,6 +24,9 @@
         setPageDisplay("settings", page);
         setPageDisplay("help", page);
         closeMobileMenu();
+        if (page === "settings" && window.MiOpenApp && window.MiOpenApp.loadSettingsOnce) {
+            window.MiOpenApp.loadSettingsOnce();
+        }
     };
 
     document.addEventListener("DOMContentLoaded", function () {

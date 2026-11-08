@@ -10,5 +10,8 @@
 
 void initCloudMqtt();
 void cloudMqttRequestStatePublish();
+// True while the cloud link is up, and always true when no cloud link is built in:
+// the network watchdog uses it as its health signal.
+bool cloudMqttConnectedOrDisabled();
 
 #endif  // CLOUD_MQTT_H

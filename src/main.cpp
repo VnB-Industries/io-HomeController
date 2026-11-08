@@ -733,4 +733,5 @@ void loop() {
         lastHeapLogMs = now;
         Cmd::printHeapLine();
     }
+    networkWatchdogRestartCheck();
 }

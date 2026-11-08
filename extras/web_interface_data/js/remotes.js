@@ -117,8 +117,7 @@
 
                     try {
                         const result = await window.MiOpenApi.postJson("/api/command", {
-                            RemoteId: remoteId,
-                            command: "editRemote " + newName
+                            command: "editRemote " + remoteId + " " + newName.trim()
                         });
                         app.logStatus(result.message || "Remote renamed.");
                         await fetchAndDisplayRemotes(app);

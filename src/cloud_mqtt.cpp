@@ -458,6 +458,10 @@ void initCloudMqtt() {
     }
 }
 
+bool cloudMqttConnectedOrDisabled() {
+    return s_connected.load();
+}
+
 void cloudMqttRequestStatePublish() {
     s_statePublishRequested = true;
 }
@@ -466,5 +470,6 @@ void cloudMqttRequestStatePublish() {
 
 void initCloudMqtt() {}
 void cloudMqttRequestStatePublish() {}
+bool cloudMqttConnectedOrDisabled() { return true; }
 
 #endif

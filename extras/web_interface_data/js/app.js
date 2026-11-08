@@ -369,12 +369,21 @@
 
         app.logStatus("System started");
         app.logStatus("Loading devices...");
-        app.loadMqttConfig();
-        app.loadWifiConfig();
-        app.loadNetworkConfig();
-        app.loadFallbackConfig();
-        app.loadDisplayConfig();
-        app.loadSyslogConfig();
+        // Settings are fetched the first time the Settings page opens: six
+        // fewer requests per page load, which the board's memory needs.
+        let settingsLoaded = false;
+        app.loadSettingsOnce = function () {
+            if (settingsLoaded) {
+                return;
+            }
+            settingsLoaded = true;
+            app.loadMqttConfig();
+            app.loadWifiConfig();
+            app.loadNetworkConfig();
+            app.loadFallbackConfig();
+            app.loadDisplayConfig();
+            app.loadSyslogConfig();
+        };
         app.fetchAndDisplayDevices();
         app.fetchAndDisplayRemotes();
         app.loadLastAddress();

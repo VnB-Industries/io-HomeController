@@ -16,11 +16,21 @@
             requestOptions.cache = "no-store";
         }
 
+        // The board answers 503 when its memory is low (load shedding); the
+        // request was refused before any work, so it is safe to send again.
         let response;
-        try {
-            response = await fetch(requestUrl, requestOptions);
-        } catch (error) {
-            throw new Error("Device unreachable. Check that it's online or hasn't just restarted.");
+        for (let attempt = 0; ; attempt++) {
+            try {
+                response = await fetch(requestUrl, requestOptions);
+            } catch (error) {
+                throw new Error("Device unreachable. Check that it's online or hasn't just restarted.");
+            }
+            if (response.status !== 503 || attempt >= 4) {
+                break;
+            }
+            await new Promise(function (resolve) {
+                setTimeout(resolve, 400 * (attempt + 1));
+            });
         }
         const data = await ensureJson(response);
         if (!response.ok) {

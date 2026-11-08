@@ -29,6 +29,11 @@ extern struct WiFiStatus {
 
 
 void initWifi();
+// Prints WiFi state, addresses and whether the router answers (runs in its own task).
+void printNetworkReport();
+// Restarts the board if a WiFi stack reset by the network watchdog did not bring
+// the network back. Called from loop(), away from the WiFi calls that may hang.
+void networkWatchdogRestartCheck();
 void clearWifi();
 String getConfiguredWiFiSSID();
 void saveWiFiCredentials(const String &ssid, const String &password);

@@ -30,6 +30,8 @@
 #include <ESPmDNS.h>
 #include <TickerUsESP32.h>
 #include <tuple>
+#include <atomic>
+#include <cloud_mqtt.h>
 
 const long PORTAL_TIMEOUT = 300000; // 5 minuten = 300.000 ms, used only as a fallback if NVS has no configured timeout
 const uint32_t WIFI_NOTIFY_GOT_IP = BIT0;
@@ -380,6 +382,103 @@ static void runConfigPortal(const std::string& ssid, bool hasWifiConfiguration) 
     clearDisplayMessages();
 }
 
+// ---------------------------------------------------------------------------
+// Network watchdog
+//
+// Observed: after a burst of web requests the board stopped answering ping
+// and could not reach the cloud, while the WiFi driver still reported a
+// connection, so the disconnect handling above never ran. The board stayed
+// offline until a manual reset.
+//
+// When the cloud link has been down for a while, WiFi says connected and the
+// router does not answer either, the WiFi stack is reset. If the network is
+// still down a while later, the board restarts. A router that answers means
+// the internet or the broker is down, which a reset would not fix.
+// ---------------------------------------------------------------------------
+static constexpr uint32_t NET_CHECK_INTERVAL_MS = 30000;
+static constexpr uint32_t NET_DOWN_BEFORE_RESET_MS = 60000;
+static constexpr uint32_t NET_DOWN_AFTER_RESET_BEFORE_RESTART_MS = 120000;
+static uint32_t s_cloudDownSinceMs = 0;
+static std::atomic<uint32_t> s_netResetAtMs{0};
+
+// Opens a TCP connection to the router (web interface, then DNS) to prove the
+// local network and this board's IP stack still work.
+static bool routerAnswers() {
+    const IPAddress gateway = WiFi.gatewayIP();
+    if (gateway == IPAddress(0, 0, 0, 0)) {
+        return false;
+    }
+    for (const uint16_t port : {static_cast<uint16_t>(80), static_cast<uint16_t>(53)}) {
+        WiFiClient client;
+        if (client.connect(gateway, port, 2000)) {
+            client.stop();
+            return true;
+        }
+    }
+    return false;
+}
+
+static void checkNetworkHealth() {
+    const uint32_t now = millis();
+    if (cloudMqttConnectedOrDisabled()) {
+        s_cloudDownSinceMs = 0;
+        s_netResetAtMs = 0;
+        return;
+    }
+    if (WiFi.status() != WL_CONNECTED) {
+        return;  // A real disconnect: the reconnect logic above owns this case.
+    }
+    if (s_cloudDownSinceMs == 0) {
+        s_cloudDownSinceMs = now;
+        return;
+    }
+    if (s_netResetAtMs != 0 ||
+        static_cast<int32_t>(now - s_cloudDownSinceMs) < static_cast<int32_t>(NET_DOWN_BEFORE_RESET_MS)) {
+        return;
+    }
+    if (routerAnswers()) {
+        return;
+    }
+    Serial.println("WiFi: connected but the router does not answer, resetting the WiFi stack");
+    addLogMessage("WiFi: network unresponsive, resetting WiFi stack");
+    s_netResetAtMs = now == 0 ? 1 : now;
+    resetWiFiStack();
+}
+
+void networkWatchdogRestartCheck() {
+    const uint32_t resetAt = s_netResetAtMs.load();
+    if (resetAt == 0 || cloudMqttConnectedOrDisabled()) {
+        return;
+    }
+    if (static_cast<int32_t>(millis() - resetAt) >= static_cast<int32_t>(NET_DOWN_AFTER_RESET_BEFORE_RESTART_MS)) {
+        Serial.println("WiFi: network still down after a WiFi stack reset, restarting");
+        addLogMessage("WiFi: network still down after reset, restarting");
+        delay(200);
+        ESP.restart();
+    }
+}
+
+static void networkReportTask(void *) {
+    static const char *const kStatus[] = {"idle", "no SSID", "scan done", "connected",
+                                          "connect failed", "connection lost", "disconnected"};
+    const wl_status_t status = WiFi.status();
+    const char *statusText = static_cast<unsigned>(status) < 7 ? kStatus[status] : "unknown";
+    Serial.printf("Net: WiFi %s (%d), SSID '%s', RSSI %d dBm\n", statusText, static_cast<int>(status),
+                  WiFi.SSID().c_str(), WiFi.RSSI());
+    Serial.printf("Net: IP %s, gateway %s, DNS %s\n", WiFi.localIP().toString().c_str(),
+                  WiFi.gatewayIP().toString().c_str(), WiFi.dnsIP().toString().c_str());
+    Serial.printf("Net: cloud link %s\n", cloudMqttConnectedOrDisabled() ? "up (or not built in)" : "down");
+    Serial.printf("Net: router %s\n", routerAnswers() ? "answers" : "does NOT answer");
+    vTaskDelete(nullptr);
+}
+
+void printNetworkReport() {
+    // The router probe blocks for a few seconds: keep it off the console timer task.
+    if (xTaskCreate(networkReportTask, "netReport", 4096, nullptr, 1, nullptr) != pdPASS) {
+        Serial.println("Net: could not start the report task");
+    }
+}
+
 static void wifiWorker(void * pvParameters) {
     wl_status_t status = WL_DISCONNECTED;
 
@@ -411,7 +510,11 @@ static void wifiWorker(void * pvParameters) {
 
     uint32_t events = 0;
     while (true) {
-        xTaskNotifyWait(0, UINT32_MAX, &events, portMAX_DELAY);
+        events = 0;
+        if (xTaskNotifyWait(0, UINT32_MAX, &events, pdMS_TO_TICKS(NET_CHECK_INTERVAL_MS)) != pdTRUE) {
+            checkNetworkHealth();
+            continue;
+        }
 
         if ((events & WIFI_NOTIFY_DISCONNECTED) != 0) {
             handleWifiDisconnected();

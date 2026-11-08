@@ -979,7 +979,27 @@ static ArUploadHandlerFunction guardedUpload(UploadCallback callback) {
   };
 }
 
+// Load shedding. A page load fires about 25 requests at once, each with its
+// own buffers and digest login check. When the heap ran out mid-burst, an
+// allocation failed inside the web server or filesystem libraries, which do
+// not check for it, and the board crashed (observed: three different crash
+// sites, all allocation failures, during one page load). Refusing new
+// requests while the heap is low keeps the burst within what is left; the
+// page retries its API calls on 503.
+static constexpr uint32_t kMinFreeHeapForRequest = 40000;
+static constexpr uint32_t kMinHeapBlockForRequest = 16000;
+
 void setupWebServer() {
+  server.addMiddleware([](AsyncWebServerRequest *request, ArMiddlewareNext next) {
+    if (ESP.getFreeHeap() < kMinFreeHeapForRequest || ESP.getMaxAllocHeap() < kMinHeapBlockForRequest) {
+      AsyncWebServerResponse *busy = request->beginResponse(503, "text/plain", "Busy, retry");
+      busy->addHeader("Retry-After", "1");
+      busy->addHeader("Cache-Control", "no-store");
+      request->send(busy);
+      return;
+    }
+    next();
+  });
   server.addMiddleware([](AsyncWebServerRequest *request, ArMiddlewareNext next) {
     if (!isSameOrigin(request)) {
       request->send(403, "text/plain", "Forbidden");
@@ -1061,6 +1081,10 @@ void setupWebServer() {
   staticHandler.setDefaultFile("index.html");
   // Web files are stored uncompressed; skip the .gz probe that logs an error per request.
   staticHandler.setTryGzipFirst(false);
+  // The page is one bundled file (tools/prepare_fs.py) plus the logo and a
+  // language file: revalidating them on each load costs three small 304s
+  // thanks to the ETag, and an updated page shows up immediately.
+  staticHandler.setCacheControl("no-cache");
   staticHandler.setFilter([](AsyncWebServerRequest *request) {
     return !request->url().startsWith("/api");
   });

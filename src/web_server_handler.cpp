@@ -217,6 +217,7 @@ void handleApiDevices(AsyncWebServerRequest *request, JsonArray &root) {
     deviceObj["description"] = r.description.c_str();
     deviceObj["position"] = r.positionTracker.getPosition();
     deviceObj["travel_time"] = r.travelTime;
+    deviceObj["room"] = r.room.c_str();
     deviceObj["paired"] = r.paired;
     deviceObj["repeatOnNoResponse"] = r.repeatOnNoResponse;
   }
